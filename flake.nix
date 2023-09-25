@@ -2,9 +2,12 @@
   description = "A development environment";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:lopsided98/nixpkgs/nix-ros";
     flake-utils.url = "github:numtide/flake-utils";
-    nix-ros.url = "github:lopsided98/nix-ros-overlay";
+    nix-ros = {
+      url = "github:lopsided98/nix-ros-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Flake outputs
@@ -22,6 +25,7 @@
           packages = with pkgs; [
             rosPackages.humble.desktop
             colcon
+            gazebo
             
             # Setup bash autocompletions
             (writeShellScriptBin "completions" ''
