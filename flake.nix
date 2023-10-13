@@ -26,18 +26,24 @@
             rosPackages.humble.desktop
             colcon
             gazebo
-            
-            # Setup bash autocompletions
-            (writeShellScriptBin "completions" ''
-            if (return 0 2>/dev/null); then
-              echo "Adding ROS2 completions to the environment."
-              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete ros2)"
-              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete colcon)"
-              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete rosidl)"
-            else
-              echo "Completions must be sourced, skipping."
-              echo "source completions"
-            fi
+
+            # Setup environment for ROS
+            (writeShellScriptBin "nix-ros-setup" ''
+              # Setup bash autocompletions
+              if (return 0 2>/dev/null); then
+                echo "Adding ROS2 completions to the environment."
+                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete ros2)"
+                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete colcon)"
+                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete rosidl)"
+              else
+                echo "Nix-ros-setup must be sourced, skipping."
+                echo "source nix-ros-setup"
+              fi
+
+              # Set nixGL wrapper for gazebo
+              if command -v nixGLIntel &>/dev/null; then
+                alias gazebo="nixGLIntel gazebo --verbose"
+              fi
             '')
           ];
 
