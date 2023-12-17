@@ -18,37 +18,60 @@
           inherit system;
           overlays = [ nix-ros.overlays.default ];
         };
-      in {
+      in
+      {
         # Development environment output
         devShell = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
+            (python3.withPackages (ps: with ps; [ mypy jedi ]))
             rosPackages.humble.desktop
+            rosPackages.humble.gazebo-ros-pkgs
+            rosPackages.humble.gazebo-ros2-control
             colcon
-            gazebo
 
             # Setup environment for ROS
-            (writeShellScriptBin "nix-ros-setup" ''
+            (writeShellScriptBin "nix-env-hook" ''
               # Setup bash autocompletions
-              if (return 0 2>/dev/null); then
-                echo "Adding ROS2 completions to the environment."
-                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete ros2)"
-                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete colcon)"
-                eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete rosidl)"
-              else
+              if ! (return 0 2>/dev/null); then
                 echo "Nix-ros-setup must be sourced, skipping."
                 echo "source nix-ros-setup"
+                exit 1
               fi
+
+              # Completions
+              echo "Adding ROS2 completions to the environment."
+              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete ros2)"
+              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete colcon)"
+              eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete rosidl)"
+              source "${pkgs.gazebo}/share/gazebo/setup.sh"
+
+              # Build tools
+              function colcon() {
+                # Filter no setup files warning
+                command colcon "$@" 2>&1 | grep -v "WARNING:colcon\.colcon_ros\.prefix_path\.ament:The path .* in the environment variable AMENT_PREFIX_PATH doesn't contain any 'local_setup\..*' files"
+              }
+
+              function clean() {
+                rm -r $FLAKE_ROOT/build $FLAKE_ROOT/install $FLAKE_ROOT/log
+              }
+              alias install="source $FLAKE_ROOT/install/setup.bash"
+              alias build="colcon build --symlink-install && install"
+              alias clean-build="clean && build"
 
               # Set nixGL wrapper for gazebo
               if command -v nixGLIntel &>/dev/null; then
-                alias gazebo="nixGLIntel gazebo --verbose"
+                alias gazebo="nixGLIntel gazebo --verbose -s libgazebo_ros_init.so -s libgazebo_ros_factory.so -s libgazebo_ros_force_system.so"
+                alias rviz2="nixGLIntel rviz2"
               fi
             '')
           ];
 
           # Environment variables provided in the environment
           PROJECT = "warehouse_automation";
+
+          # Disable the system notification handler extension
+          COLCON_EXTENSION_BLOCKLIST="colcon_core.event_handler.desktop_notification";
 
           # Hook commands to run in the environment
           shellHook = ''
