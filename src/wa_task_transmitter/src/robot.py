@@ -4,8 +4,8 @@ from abc import ABC
 from enum import Enum, auto
 
 from geometry_msgs.msg import Point, Pose, Quaternion
-from id_handler import IDHandler
-from rclpy.node import Node
+
+from src.entity import TickActionEntity
 
 
 class RobotState(Enum):
@@ -14,30 +14,12 @@ class RobotState(Enum):
     Off = auto()
 
 
-class Robot(Node, ABC):
-    _id_handler = IDHandler()
+class Robot(TickActionEntity, ABC):
+    def __init__(self, action_period: float) -> None:
+        super().__init__(action_period)
 
-    @classmethod
-    def get_active_ids(cls) -> tuple[int, ...]:
-        """Get the list of current active bot ids."""
-        return cls._id_handler.active_ids
-
-    def __init__(self, bot: str) -> None:
-        self._r_id = self._id_handler.gen_id()
-        super().__init__(node_name=f"{bot}_{self.id}")
-        self._name = bot
         self._state = RobotState.Idle
         self._pose = Pose()
-
-    @property
-    def r_id(self) -> int:
-        """Get this robot's id."""
-        return self._r_id
-
-    @property
-    def name(self) -> str:
-        """Get this robot's name."""
-        return self._name
 
     @property
     def state(self) -> RobotState:
@@ -61,10 +43,10 @@ class Robot(Node, ABC):
 
     def turn_on(self) -> None:
         """Turn on this robot."""
-        self._id_handler.deactivate_id(self.id)
-        self._state = RobotState.Off
+        self.activate()
+        self._state = RobotState.Idle
 
     def shutdown(self) -> None:
         """Shutdown this robot."""
-        self._id_handler.deactivate_id(self.id)
+        self.deactivate()
         self._state = RobotState.Off

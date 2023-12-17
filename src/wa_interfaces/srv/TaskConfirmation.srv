@@ -1,0 +1,5 @@
+# Request part
+uint32 task_uid
+---
+# Response part
+bool task_confirmed
