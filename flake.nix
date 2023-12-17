@@ -8,15 +8,20 @@
       url = "github:lopsided98/nix-ros-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixgl = {
+      url = "github:guibou/nixGL";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
 
   # Flake outputs
-  outputs = { self, nixpkgs, flake-utils, nix-ros }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ nix-ros.overlays.default ];
+          overlays = [ inputs.nix-ros.overlays.default inputs.nixgl.overlay ];
         };
       in
       {
@@ -30,7 +35,10 @@
             rosPackages.humble.gazebo-ros2-control
             colcon
 
-            # Setup environment for ROS
+            # Setup nixgl for gpu applications
+            nixgl.nixGLIntel
+
+            # Setup environment hook for ROS2
             (writeShellScriptBin "nix-env-hook" ''
               # Setup bash autocompletions
               if ! (return 0 2>/dev/null); then
@@ -71,7 +79,7 @@
           PROJECT = "warehouse_automation";
 
           # Disable the system notification handler extension
-          COLCON_EXTENSION_BLOCKLIST="colcon_core.event_handler.desktop_notification";
+          COLCON_EXTENSION_BLOCKLIST = "colcon_core.event_handler.desktop_notification";
 
           # Hook commands to run in the environment
           shellHook = ''
