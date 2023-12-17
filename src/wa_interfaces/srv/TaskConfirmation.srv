@@ -1,5 +1,6 @@
 # Request part
 uint32 task_uid
+string entity
 ---
 # Response part
 bool task_confirmed

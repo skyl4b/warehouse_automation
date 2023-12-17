@@ -88,15 +88,15 @@ class TaskTransmitter(TickActionEntity):
         request: TaskConfirmation.Request,
         response: TaskConfirmation.Response,
     ) -> TaskConfirmation.Response:
-        task_uid = request.task_uid
+        task_uid, entity = request.task_uid, request.entity
         broadcasting = self._task_queue.get()
 
         if broadcasting is not None and task_uid == broadcasting.uid:
-            self.get_logger().info(f"Confirming task {task_uid}")
+            self.get_logger().info(f"Confirming task {task_uid} to {entity}")
             self._task_queue.done()
             response.task_confirmed = True
         else:
-            self.get_logger().info(f"Denying task {task_uid}")
+            self.get_logger().info(f"Denying task {task_uid} to {entity}")
             response.task_confirmed = False
 
         return response

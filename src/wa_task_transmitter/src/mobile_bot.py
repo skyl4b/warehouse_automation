@@ -85,6 +85,7 @@ class MobileBot(Robot):
 
             request = TaskConfirmation.Request()
             request.task_uid = msg.data
+            request.entity = self.name
             self.confirmation_client.call_async(request).add_done_callback(
                 self.handle_task_confirmation,
             )
