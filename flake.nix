@@ -13,6 +13,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
+
   };
 
   # Flake outputs
@@ -21,7 +22,74 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ inputs.nix-ros.overlays.default inputs.nixgl.overlay ];
+          overlays = [
+            inputs.nix-ros.overlays.default
+            inputs.nixgl.overlay
+
+            # HACK: Fix navigation2 build
+            # 1. Use patched ompl until this PR is merged
+            # 2. Add flag "-Wno-error=maybe-uninitialized"
+            # See https://github.com/lopsided98/nix-ros-overlay/issues/311
+            # and https://github.com/lopsided98/nix-ros-overlay/issues/286
+            # for more information.
+            (self: super: {
+              rosPackages = super.rosPackages // {
+                humble = super.rosPackages.humble // rec {
+                  # Fix ompl
+                  # NOTE: The entire dependency stack must be overridden
+                  ompl = super.rosPackages.humble.ompl.overrideAttrs ({ patches ? [ ], ... }: {
+                    version = "Fix full paths patch";
+                    patches = patches ++ [
+                      # Use full install paths for pkg-config
+                      (self.fetchpatch {
+                        url = "https://github.com/hacker1024/ompl/commit/1ddecbad87b454ac0d8e1821030e4cf7eeff2db2.patch";
+                        hash = "sha256-sAQLrWHoR/DhHk8TtUEy8E8VXqrvtXl2BGS5UvElJl8=";
+                      })
+                    ];
+                  });
+                  nav2-smac-planner = super.rosPackages.humble.nav2-smac-planner.override { ompl = ompl; };
+
+                  # Fix build flags
+                  dwb-critics = super.rosPackages.humble.dwb-critics.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  nav2-behaviors = super.rosPackages.humble.nav2-behaviors.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  dwb-plugins = super.rosPackages.humble.dwb-plugins.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  nav2-dwb-controller = super.rosPackages.humble.nav2-dwb-controller.override {
+                    dwb-critics = dwb-critics;
+                    dwb-plugins = dwb-plugins;
+                  };
+                  nav2-constrained-smoother = super.rosPackages.humble.nav2-constrained-smoother.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  nav2-planner = super.rosPackages.humble.nav2-planner.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  nav2-smoother = super.rosPackages.humble.nav2-smoother.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+                  nav2-waypoint-follower = super.rosPackages.humble.nav2-waypoint-follower.overrideAttrs (oldAttrs: {
+                    CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
+                  });
+
+                  # Apply fixes
+                  navigation2 = super.rosPackages.humble.navigation2.override {
+                    nav2-smac-planner = nav2-smac-planner;
+                    nav2-dwb-controller = nav2-dwb-controller;
+                    nav2-behaviors = nav2-behaviors;
+                    nav2-constrained-smoother = nav2-constrained-smoother;
+                    nav2-planner = nav2-planner;
+                    nav2-smoother = nav2-smoother;
+                    nav2-waypoint-follower = nav2-waypoint-follower;
+                  };
+                };
+              };
+            })
+          ];
         };
       in
       {
@@ -30,10 +98,16 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             (python3.withPackages (ps: with ps; [ mypy jedi ]))
+            # Base ROS2 packages
             rosPackages.humble.desktop
+            colcon
+
+            # Gazebo ROS2 interface
             rosPackages.humble.gazebo-ros-pkgs
             rosPackages.humble.gazebo-ros2-control
-            colcon
+
+            # Navigation packages
+            rosPackages.humble.navigation2
 
             # Setup nixgl for gpu applications
             nixgl.nixGLIntel
