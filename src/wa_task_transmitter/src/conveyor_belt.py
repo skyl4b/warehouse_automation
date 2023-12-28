@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import StrEnum
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
@@ -25,13 +25,13 @@ class ConveyorBelt(VariableTickActionEntity, ABC):
         # Outputs
         self._task_pub = self.create_publisher(
             UInt32,
-            f"wa/conveyor_belt/{self.belt_type().value}",
+            f"wa/conveyor_belt/{self.belt_type()}",
             10,
         )
 
     @classmethod
     def basename(cls) -> str:
-        return f"{cls.belt_type().value}_conveyor_belt"
+        return f"{cls.belt_type()}_conveyor_belt"
 
     @classmethod
     @abstractmethod
@@ -45,7 +45,7 @@ class ConveyorBelt(VariableTickActionEntity, ABC):
         self._task_pub.publish(msg)
 
 
-class ConveyorBeltType(Enum):
+class ConveyorBeltType(StrEnum):
     Input = "input"
     Output = "output"
 
