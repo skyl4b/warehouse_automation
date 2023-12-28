@@ -7,6 +7,7 @@
     nix-ros = {
       url = "github:lopsided98/nix-ros-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
     husky = {
       url = "github:husky/husky/humble-devel";
