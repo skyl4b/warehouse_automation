@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from random import random, seed
 from typing import TYPE_CHECKING
 
 import rclpy
@@ -20,7 +21,6 @@ class MobileBot(Robot):
 
         self._task_queue = TaskQueue(size=2)
         self.confirming = None
-        self.goal = 0
 
         # Inputs
         self.confirmation_client = self.create_client(
@@ -65,16 +65,21 @@ class MobileBot(Robot):
             return
 
         # Execution logic
-        if self.goal == 5:  # noqa: PLR2004
+        if not self.is_active():
+            self.get_logger().info(f"Moving to task {task_uid}")
+            self.set_goal(10 * random(), 10 * random())
+            self.move_to_goal()
+        elif self.has_arrived():
             self.get_logger().info(f"Task {task_uid} done")
             msg = UInt32()
             msg.data = task_uid
             self.task_completed_pub.publish(msg)
-            self.goal = 0
             self._task_queue.done()
         else:
-            self.get_logger().info(f"Executing task {task_uid}")
-            self.goal += 1
+            self.get_logger().info(
+                f"Executing task {task_uid}, "
+                f"status {self.get_navigation_feedback()}",
+            )
 
     def task_callback(self, msg: UInt32) -> None:
         # Use https://app.gazebosim.org/OpenRobotics/fuel/models/Depot
@@ -111,6 +116,8 @@ class MobileBot(Robot):
 
 
 def main():
+    seed(42)
+
     rclpy.init()
     executor = SingleThreadedExecutor()
 
