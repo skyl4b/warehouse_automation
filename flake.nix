@@ -227,6 +227,9 @@
         devShell = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
+            # Bash interactive to solve some issues with subshells breaking
+            bashInteractive
+
             # Python packages
             (python3.withPackages (ps: with ps; [ mypy jedi ]))
 
@@ -272,6 +275,8 @@
               paths = with pkgs; [
                 # Base ROS2 packages
                 rosPackages.humble.desktop
+                rosPackages.humble.ament-cmake-core
+                rosPackages.humble.python-cmake-module
                 colcon
 
                 # Gazebo ROS2 interface
@@ -296,6 +301,9 @@
 
           # Disable the system notification handler extension
           COLCON_EXTENSION_BLOCKLIST = "colcon_core.event_handler.desktop_notification";
+
+          # Default to x11 on QT apps (many break on wayland)
+          QT_QPA_PLATFORM = "xcb";
 
           # Hook commands to run in the environment
           shellHook = ''
