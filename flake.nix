@@ -45,7 +45,7 @@
                       })
                     ];
                   });
-                  nav2-smac-planner = prev.rosPackages.humble.nav2-smac-planner.override { ompl = ompl; };
+                  nav2-smac-planner = prev.rosPackages.humble.nav2-smac-planner.override { inherit ompl; };
 
                   # Fix build flags
                   dwb-critics = prev.rosPackages.humble.dwb-critics.overrideAttrs (oldAttrs: {
@@ -58,8 +58,8 @@
                     CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
                   });
                   nav2-dwb-controller = prev.rosPackages.humble.nav2-dwb-controller.override {
-                    dwb-critics = dwb-critics;
-                    dwb-plugins = dwb-plugins;
+                    inherit dwb-critics;
+                    inherit dwb-plugins;
                   };
                   nav2-constrained-smoother = prev.rosPackages.humble.nav2-constrained-smoother.overrideAttrs (oldAttrs: {
                     CXXFLAGS = oldAttrs.CXXFLAGS or "" + " -Wno-error=maybe-uninitialized";
@@ -76,16 +76,16 @@
 
                   # Apply fixes
                   navigation2 = prev.rosPackages.humble.navigation2.override {
-                    nav2-smac-planner = nav2-smac-planner;
-                    nav2-dwb-controller = nav2-dwb-controller;
-                    nav2-behaviors = nav2-behaviors;
-                    nav2-constrained-smoother = nav2-constrained-smoother;
-                    nav2-planner = nav2-planner;
-                    nav2-smoother = nav2-smoother;
-                    nav2-waypoint-follower = nav2-waypoint-follower;
+                    inherit nav2-smac-planner;
+                    inherit nav2-dwb-controller;
+                    inherit nav2-behaviors;
+                    inherit nav2-constrained-smoother;
+                    inherit nav2-planner;
+                    inherit nav2-smoother;
+                    inherit nav2-waypoint-follower;
                   };
                   nav2-bringup = prev.rosPackages.humble.nav2-bringup.override {
-                    navigation2 = navigation2;
+                    inherit navigation2;
                   };
                 };
               };
@@ -233,40 +233,20 @@
             # Python packages
             (python3.withPackages (ps: with ps; [ mypy jedi ]))
 
-            # Setup environment hook for ROS2
-            (writeShellScriptBin "nix-env-hook" ''
+            # Setup environment install for ROS2
+            (writeShellScriptBin "nix-ros-install" ''
               # Setup bash autocompletions
               if ! (return 0 2>/dev/null); then
-                echo "Nix-ros-setup must be sourced, skipping."
-                echo "source nix-ros-setup"
+                echo "Error: $0 must be sourced, exiting."
+                echo "source $0"
                 exit 1
               fi
 
               # Completions
-              echo "Adding ROS2 completions to the environment."
               eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete ros2)"
               eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete colcon)"
               eval "$(${python3Packages.argcomplete}/bin/register-python-argcomplete rosidl)"
               source "${pkgs.gazebo}/share/gazebo/setup.sh"
-
-              # Environment variables for turtlebot3 and nav2-bringup
-              export TURTLEBOT3_MODEL=waffle
-              export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:`ros2 pkg prefix turtlebot3_gazebo`/share/turtlebot3_gazebo/models/"
-
-              # Build tools
-              function colcon() {
-                # Filter no setup files warning
-                command colcon "$@" 2>&1 | grep -v "WARNING:colcon\.colcon_ros\.prefix_path\.ament:The path .* in the environment variable AMENT_PREFIX_PATH doesn't contain any 'local_setup\..*' files"
-              }
-              function clean() {
-                rm -r $FLAKE_ROOT/build $FLAKE_ROOT/install $FLAKE_ROOT/log
-              }
-              alias install="source $FLAKE_ROOT/install/setup.bash"
-              alias build="colcon build --symlink-install && install"
-              alias clean-build="clean && build"
-
-              # Apps wrappers
-              alias gazebo="gazebo --verbose -s libgazebo_ros_init.so -s libgazebo_ros_factory.so -s libgazebo_ros_force_system.so"
             '')
           ];
           nativeBuildInputs = [
@@ -296,14 +276,8 @@
             })
           ];
 
-          # Environment variables provided in the environment
-          PROJECT = "warehouse_automation";
-
-          # Disable the system notification handler extension
-          COLCON_EXTENSION_BLOCKLIST = "colcon_core.event_handler.desktop_notification";
-
-          # Default to x11 on QT apps (many break on wayland)
-          QT_QPA_PLATFORM = "xcb";
+          # Override the default ROS2 installation command
+          WA_ROS_INSTALL_OVERRIDE = "source nix-ros-install";
 
           # Hook commands to run in the environment
           shellHook = ''

@@ -1,7 +1,14 @@
 #!/usr/bin/env -S just --justfile
 
 dir := justfile_directory()
+
+# Package prefix for the warehouse_automation packages
+
 pkg_prefix := "wa_"
+
+# Path to the custom empty Gazebo world file
+
+empty_world := dir / "src/wa_environment/worlds/empty.world"
 
 # Start a new shell with ROS2 setup
 @repl:
@@ -18,8 +25,12 @@ setup:
     export PROJECT_ROOT="{{ dir }}"
 
     # Setup ROS2
-    ros_path="/opt/ros/humble"
-    [[ -d "$ros_path" ]] && source "$ros_path/setup.bash"
+    export ROS_DISTRO="humble"
+    if [[ -n "$WA_ROS_INSTALL_OVERRIDE" ]]; then
+        $WA_ROS_INSTALL_OVERRIDE
+    else
+        source "/opt/ros/$ROS_DISTRO/setup.bash"
+    fi
 
     # Disable the system notification handler extension
     export COLCON_EXTENSION_BLOCKLIST="colcon_core.event_handler.desktop_notification"
@@ -28,11 +39,29 @@ setup:
     export QT_QPA_PLATFORM="xcb"
 
 # Build the ROS2 warehouse_automation workspace
-build:
+build packages="":
     #!/usr/bin/env bash
     eval "$(just setup)"
     set -euo pipefail
-    colcon build --symlink-install
+
+    # Filter out the warning about missing local_setup files.
+    # Since this warning is emitted with logger, it can't be
+    # filtered with the COLCON_WARNINGS environment variable.
+    warning_filter="WARNING:colcon\.colcon_ros\.prefix_path\.ament:\
+    The path .* in the environment variable AMENT_PREFIX_PATH \
+    doesn't contain any 'local_setup\..*' files"
+
+    # Wrap build command
+    function _build() {
+        colcon build "$@" --symlink-install 2>&1 | grep -v "$warning_filter"
+    }
+
+    # Build the workspace with all or selected packages
+    if [[ -n "{{ packages }}" ]]; then
+        _build --packages-select "{{ packages }}"
+    else
+        _build
+    fi
 
 # Install the ROS2 warehouse_automation workspace (must be evaluated)
 install:
@@ -41,7 +70,7 @@ install:
     # in bash, run it with `eval $(just install)`
 
     # Run the setup recipe
-    eval $(just setup)
+    eval "$(just setup)"
 
     # Source the workspace setup.bash to install the local ROS2 packages
     source {{ dir }}/install/setup.bash 2>/dev/null
@@ -60,6 +89,31 @@ list-packages:
     eval "$(just install)"
     set -euo pipefail
     ros2 pkg list | grep "^{{ pkg_prefix }}" || echo "No packages found"
+
+# Open Gazebo with the specified world file
+gazebo world=empty_world:
+    #!/usr/bin/env bash
+    eval "$(just install)"
+    set -euo pipefail
+
+    # Set Gazebo model lookup paths
+    custom_models_path="{{ dir }}/src/wa_environment/models"
+    if [ -z "${GAZEBO_MODEL_PATH:-}" ]; then
+        export GAZEBO_MODEL_PATH="$custom_models_path"
+    else
+        export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$custom_models_path"
+    fi
+
+    # Open the Gazebo simulator with the ROS plugins
+    gazebo --verbose \
+        -s libgazebo_ros_init.so \
+        -s libgazebo_ros_factory.so \
+        -s libgazebo_ros_force_system.so \
+        "{{ world }}"
+
+# Start a Nix shell with the ROS2 environment for development
+nix:
+    nix develop
 
 # Start a Docker container with the ROS2 environment for development
 docker-repl:
