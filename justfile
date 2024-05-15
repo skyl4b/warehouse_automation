@@ -10,15 +10,21 @@ pkg_prefix := "wa_"
 
 empty_world := dir / "src/wa_environment/worlds/empty.world"
 
-# Start a new shell with ROS2 setup
-@repl:
-    bash --init-file <(echo "source \"$HOME/.bashrc\"; eval $(just setup)")
+# Start a new shell with ROS2 set up
+repl:
+    #!/usr/bin/env bash
+    init_file=$(cat <<-END
+        source "$HOME/.bashrc"
+        source <(just install)
+    END
+    )
+    bash --init-file <(echo "$init_file")
 
-# Setup ROS2 in the current shell (must be evaluated)
+# Setup ROS2 in the current shell (must be sourced)
 setup:
     #!/usr/bin/env -S cat -s
-    # Must be executed in the main shell
-    # in bash, run it with `eval $(just setup)`
+    # Must be sourced to the main shell
+    # in bash, run it with `source <(just setup)`
 
     # Setup the project
     export PROJECT="warehouse_automation"
@@ -41,7 +47,7 @@ setup:
 # Build the ROS2 warehouse_automation workspace
 build packages="":
     #!/usr/bin/env bash
-    eval "$(just setup)"
+    source <(just setup)
     set -euo pipefail
 
     # Filter out the warning about missing local_setup files.
@@ -63,22 +69,22 @@ build packages="":
         _build
     fi
 
-# Install the ROS2 warehouse_automation workspace (must be evaluated)
+# Install the ROS2 warehouse_automation workspace (must be sourced)
 install:
     #!/usr/bin/env -S cat -s
-    # Must be executed in the main shell
-    # in bash, run it with `eval $(just install)`
+    # Must be sourced to the main shell
+    # in bash, run it with `source <(just install)`
 
     # Run the setup recipe
-    eval "$(just setup)"
+    source <(just setup)
 
     # Source the workspace setup.bash to install the local ROS2 packages
-    source {{ dir }}/install/setup.bash 2>/dev/null
+    source "{{ dir }}/install/setup.bash" 2>/dev/null
 
 # Remove the build artifacts from the warehouse_automation workspace
 [confirm("Would you like to clean the workspace? [y/N]")]
 @clean:
-    @rm -rf {{ dir }}/build {{ dir }}/install {{ dir }}/log
+    @rm -rf "{{ dir }}/build" "{{ dir }}/install" "{{ dir }}/log"
 
 # Rebuild the warehouse_automation workspace from scratch
 clean-build: clean build
@@ -86,14 +92,14 @@ clean-build: clean build
 # List the warehouse_automation packages available in the environment
 list-packages:
     #!/usr/bin/env bash
-    eval "$(just install)"
+    source <(just install)
     set -euo pipefail
     ros2 pkg list | grep "^{{ pkg_prefix }}" || echo "No packages found"
 
 # Open Gazebo with the specified world file
 gazebo world=empty_world:
     #!/usr/bin/env bash
-    eval "$(just install)"
+    source <(just install)
     set -euo pipefail
 
     # Set Gazebo model lookup paths
