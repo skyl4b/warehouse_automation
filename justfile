@@ -6,9 +6,9 @@ dir := justfile_directory()
 
 pkg_prefix := "wa_"
 
-# Path to the custom empty Gazebo world file
+# Worlds directory
 
-empty_world := dir / "src/wa_environment/worlds/empty.world"
+world_dir := dir / "src/wa_environment/worlds"
 
 # Start a new shell with ROS2 set up
 repl:
@@ -97,7 +97,7 @@ list-packages:
     ros2 pkg list | grep "^{{ pkg_prefix }}" || echo "No packages found"
 
 # Open Gazebo with the specified world file
-gazebo world=empty_world:
+gazebo world="empty":
     #!/usr/bin/env bash
     source <(just install)
     set -euo pipefail
@@ -110,16 +110,31 @@ gazebo world=empty_world:
         export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$custom_models_path"
     fi
 
+    # Check if the world provided matches the stem of a base world
+    world="{{ world }}"
+    for file in $(ls {{ world_dir }}); do
+        if [[ "${file%.*}" == "{{ world }}" ]]; then
+            world="{{ world_dir }}/$file"
+            break
+        fi
+    done
+
+    # Check if the file exists
+    if [[ ! -f "$world" ]]; then
+        echo "Error: '$world' does not exist."
+        exit 1
+    fi
+
     # Open the Gazebo simulator with the ROS plugins
     gazebo --verbose \
         -s libgazebo_ros_init.so \
         -s libgazebo_ros_factory.so \
         -s libgazebo_ros_force_system.so \
-        "{{ world }}"
+        "$world"
 
 # Start a Nix shell with the ROS2 environment for development
 nix:
-    nix develop
+    nix develop --command just repl
 
 # Start a Docker container with the ROS2 environment for development
 docker-repl:
