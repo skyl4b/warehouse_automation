@@ -1,0 +1,9 @@
+# Spawn model protocol
+#
+# Defines a service to spawn a model with a specific pose in 
+# Gazebo. Similar to gazebo_srvs/SpawnEntity.srv, but simplified.
+
+string name
+geometry_msgs/Pose pose 
+string model_namespace
+---

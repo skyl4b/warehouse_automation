@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>wa_gazebo</name>
+  <version>0.0.0</version>
+  <description>Gazebo simulation connector for the warehouse automation project</description>
+  <maintainer email="eduardo.farinati@ufrgs.br">Eduardo Farinati Leite</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>wa_environment</exec_depend>
+
+  <depend>std_msgs</depend>
+  <depend>gazebo_msgs</depend>
+  <depend>wa_interfaces</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

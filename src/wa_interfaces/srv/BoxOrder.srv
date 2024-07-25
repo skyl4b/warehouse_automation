@@ -1,0 +1,10 @@
+# Request box protocol
+#
+# Defines a service to indicate that a conveyor belt is requesting
+# a new box. In the Gazebo simulation, it represents a request
+# to spawn a box on the conveyor belt.
+
+geometry_msgs/Point position
+string attach_to
+---
+uint8 box_id

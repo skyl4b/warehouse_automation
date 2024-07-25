@@ -1,0 +1,14 @@
+material WarehouseGround{
+    technique
+    {
+        pass
+        {
+            texture_unit
+            {
+                texture ../textures/aws_robomaker_warehouse_GroundB_01.png
+                scale 1 1
+            }
+        }
+    }
+}
+

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="warehouse_ground">
+    <static>true</static>
+    <pose>0 0 -0.05 0 0 0</pose>
+    <link name="link">
+      <inertial>
+        <mass>30</mass>
+        <inertia>
+          <!-- Moments of inertia of a box -->
+          <!-- ixx = 1/12 * m * (y^2 + z^2) -->
+          <!-- ixy = 0 -->
+          <!-- ixz = 0 -->
+          <!-- iyy = 1/12 * m * (x^2 + z^2) -->
+          <!-- iyz = 0 -->
+          <!-- izz = 1/12 * m * (x^2 + y^2) -->
+          <ixx>1000</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>490</iyy>
+          <iyz>0</iyz>
+          <izz>1490</izz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>14 21 0.1</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>14 21 0.1</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <name>WarehouseGround</name>
+            <uri>model://warehouse_ground/materials/scripts/warehouse_ground.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

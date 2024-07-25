@@ -1,0 +1,9 @@
+# Box send protocol
+#
+# Defines a service to indicate that a conveyor belt is requesting
+# a box to be sent away. In the Gazebo simulation, it represents a request
+# to destroy the box.
+
+uint8 box_id
+string detach_from
+---

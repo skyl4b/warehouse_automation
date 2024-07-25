@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>wa_bringup</name>
+  <version>0.0.0</version>
+  <description>Bringup for the warehouse automation project</description>
+  <maintainer email="eduardo.farinati@ufrgs.br">Eduardo Farinati Leite</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>wa_gazebo</exec_depend>
+  <exec_depend>teleop_twist_keyboard</exec_depend>
+
+  <depend>rclpy</depend>
+  <depend>wa_environment</depend>
+
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,12 @@
+<sdf version='1.6'>
+  <world name="empty">
+    <plugin name="model_attachment" filename="libwa_gazebo_model_attach_lib.so" />
+
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+    <include>
+      <uri>model://sun</uri>
+    </include>
+  </world>
+</sdf>

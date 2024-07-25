@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!-- Conveyor belt -->
+<!-- A SDF model of a "conveyor belt" for the 'source' / 'target' simulation, -->
+<!-- it has been modified to be smaller and thinner than the original table_marble -->
+<!-- model, to be closer to the ground and not static. -->
+<!-- Based on: https://github.com/osrf/gazebo_models/table_marble -->
+<!-- License: Creative Commons Attribution 3.0 Unported -->
+<sdf version="1.6">
+  <model name="conveyor_belt">
+    <static>true</static>
+    <pose>0 0 0 0 0 0</pose>
+    <link name="link">
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model:///conveyor_belt/meshes/conveyor_belt.dae</uri>
+            <scale>0.05 0.05 0.05</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://conveyor_belt/meshes/conveyor_belt.dae</uri>
+            <scale>0.05 0.05 0.05</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Orange</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <!-- Attachment link & joint -->
+    <link name="attacher_link">
+      <pose relative_to="link">
+        0 -0.02 0.35 0 0 0
+      </pose>
+    </link>
+    <joint name="attacher_joint" type="fixed">
+      <parent>link</parent>
+      <child>attacher_link</child>
+      <pose relative_to="attacher_link">
+        0 0 0 0 0 0
+      </pose>
+    </joint>
+  </model>
+</sdf>

@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="storage_unit">
+    <static>true</static>
+    <pose>0 0 0.2 0 0 0</pose>
+    <link name="link">
+      <inertial>
+        <mass>1</mass>
+        <inertia>
+          <!-- Moments of inertia of a box -->
+          <!-- ixx = 1/12 * m * (y^2 + z^2) -->
+          <!-- ixy = 0 -->
+          <!-- ixz = 0 -->
+          <!-- iyy = 1/12 * m * (x^2 + z^2) -->
+          <!-- iyz = 0 -->
+          <!-- izz = 1/12 * m * (x^2 + y^2) -->
+          <ixx>0.021</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.021</iyy>
+          <iyz>0</iyz>
+          <izz>0.021</izz>
+        </inertia>
+        <pose>0 0 0 0 -0 0</pose>
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.5 0.5 0.05</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.5 0.5 0.05</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/SkyBlue</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <!-- Attachment link & joint -->
+    <link name="attacher_link">
+      <pose relative_to="link">
+        0 0 0.15 0 0 0
+      </pose>
+    </link>
+    <joint name="attacher_joint" type="fixed">
+      <parent>link</parent>
+      <child>attacher_link</child>
+      <pose relative_to="attacher_link">
+        0 0 0 0 0 0
+      </pose>
+    </joint>
+  </model>
+</sdf>

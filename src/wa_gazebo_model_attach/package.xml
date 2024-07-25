@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+ <name>wa_gazebo_model_attach</name>
+ <version>0.0.0</version>
+ <description>A model attachment plugin for Gazebo</description>
+ <maintainer email="eduardo.farinati@ufrgs.br">Eduardo Farinati Leite</maintainer>
+ <license>MIT</license>
+ <buildtool_depend>ament_cmake</buildtool_depend>
+ <buildtool_depend>ament_cmake_python</buildtool_depend>
+ <depend>gazebo_dev</depend>
+ <depend>gazebo_msgs</depend>
+ <depend>gazebo_ros</depend>
+ <depend>rclcpp</depend>
+ <depend>std_msgs</depend>
+ <depend>wa_interfaces</depend>
+ <build_depend>rosidl_default_generators</build_depend>
+ <exec_depend>rosidl_default_runtime</exec_depend>
+ <exec_depend>rclpy</exec_depend>
+ <member_of_group>rosidl_interface_packages</member_of_group>
+ <test_depend>launch_testing_ament_cmake</test_depend>
+ <test_depend>ros2launch</test_depend>
+ <export>
+  <build_type>ament_cmake</build_type>
+  <gazebo_ros plugin_path="${prefix}/lib" gazebo_media_path="${prefix}" />
+ </export>
+</package>

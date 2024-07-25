@@ -5,11 +5,16 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Suppress warnings about policy CMP0148
+# "Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules are removed." 
+# Needs to be fixed internally by ROS2 developers
+if(POLICY CMP0148)
+  cmake_policy(SET CMP0148 OLD)
+endif()
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -24,18 +29,17 @@ if(BUILD_TESTING)
 endif()
 
 find_package(rosidl_default_generators REQUIRED)
-set(msg_files
-  # "msg/Message1.msg"
-  # "msg/Message2.msg"
-  # etc
-  )
 
-set(srv_files
-  "srv/TaskConfirmation.srv"
-  # etc
-)
+file(GLOB msg_files RELATIVE "${CMAKE_SOURCE_DIR}" "msg/*.msg")
+file(GLOB srv_files RELATIVE "${CMAKE_SOURCE_DIR}" "srv/*.srv")
+file(GLOB action_files RELATIVE "${CMAKE_SOURCE_DIR}" "action/*.action")
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
+  ${action_files}
+
+  DEPENDENCIES
+  geometry_msgs
 )
 ament_package()

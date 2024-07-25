@@ -1,0 +1,13 @@
+# Simple toggle attach message
+#
+# Defines a message to indicate two models should be joined together
+# with a fixed link, or separated if the fixed link already exists,
+# inside a Gazebo simulation with the appropriate plugin.
+# This is a simpler version of `Attach.srv` or `Detach.srv` that
+# can work both in attachment or detachment, toggling the joint.
+# Also, it supposes the joint name and the link name are known,
+# therefore only needing the model names to be provided.
+
+string model_1
+string model_2
+---

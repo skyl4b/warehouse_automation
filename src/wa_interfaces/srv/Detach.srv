@@ -1,0 +1,17 @@
+# Detach models protocol
+#
+# Defines a service to indicate that two models joined together
+# by a fixed link should be separated in a Gazebo simulation
+# that is running with the appropriate plugin.
+# Only the name of the protocol has been modified.
+#
+# Based on: https://github.com/Boeing/gazebo_model_attachment_plugin
+# License: Apache License 2.0
+
+string joint_name
+string model_name_1
+string model_name_2
+---
+bool success
+string message
+

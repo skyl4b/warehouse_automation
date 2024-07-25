@@ -231,7 +231,7 @@
             bashInteractive
 
             # Python packages
-            (python3.withPackages (ps: with ps; [ mypy jedi ]))
+            (python3.withPackages (ps: with ps; [ numpy ]))
 
             # Setup environment install for ROS2
             (writeShellScriptBin "nix-ros-install" ''

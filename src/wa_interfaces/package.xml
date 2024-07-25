@@ -3,20 +3,22 @@
 <package format="3">
   <name>wa_interfaces</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="eduardo.farinati@ufrgs.br">skylab</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Interfaces for the warehouse automation project, msgs and srvs</description>
+  <maintainer email="eduardo.farinati@ufrgs.br">Eduardo Farinati Leite</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <exec_depend>rosidl_default_runtime</exec_depend>
+  <depend>geometry_msgs</depend>
 
+  <exec_depend>rosidl_default_runtime</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

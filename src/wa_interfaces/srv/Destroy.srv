@@ -1,0 +1,7 @@
+# Destroy model protocol
+#
+# Defines a service to destroy a model with by its name in
+# Gazebo. Similar to gazebo_srvs/DeleteEntity.srv, but simplified.
+
+string name
+---

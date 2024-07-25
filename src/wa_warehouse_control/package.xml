@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>wa_warehouse_control</name>
+  <version>0.0.0</version>
+  <description>Warehouse control for warehouse automation project</description>
+  <maintainer email="eduardo.farinati@ufrgs.br">Eduardo Farinati Leite</maintainer>
+  <license>MIT</license>
+
+  <build_depend>std_msgs</build_depend>
+
+  <exec_depend>std_msgs</exec_depend>
+
+  <depend>wa_interfaces</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

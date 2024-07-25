@@ -1,0 +1,18 @@
+# Attach models protocol
+#
+# Defines a service to indicate two models to be joined together
+# with a fixed link to a Gazebo simulation with the appropriate plugin.
+# Only the name of the protocol has been modified.
+#
+# Based on: https://github.com/Boeing/gazebo_model_attachment_plugin
+# License: Apache License 2.0
+
+string joint_name
+string model_name_1
+string link_name_1
+string model_name_2
+string link_name_2
+---
+bool success
+string message
+
