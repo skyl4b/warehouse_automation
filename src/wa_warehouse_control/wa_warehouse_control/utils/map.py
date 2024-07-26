@@ -20,11 +20,17 @@ class Model(TypedDict):
     position: Position
 
 
-class ConveyorBelts(TypedDict):
+class ConveyorBelt(Model):
     """A conveyor belt in the warehouse automation project."""
 
-    input: list[Model]
-    output: list[Model]
+    empty: bool
+
+
+class ConveyorBelts(TypedDict):
+    """The conveyor belts used in the warehouse automation project."""
+
+    input: list[ConveyorBelt]
+    output: list[ConveyorBelt]
 
 
 class StorageUnit(Model):
@@ -46,28 +52,34 @@ BASE_MAP: Final[Map] = {
             {
                 "name": "conveyor_belt_0_0",
                 "position": {"x": 3.0, "y": -8.7, "z": 0.4},
+                "empty": True,
             },
             {
                 "name": "conveyor_belt_0_1",
                 "position": {"x": 0.0, "y": -8.7, "z": 0.4},
+                "empty": True,
             },
             {
                 "name": "conveyor_belt_0_2",
                 "position": {"x": -3.0, "y": -8.7, "z": 0.4},
+                "empty": True,
             },
         ],
         "output": [
             {
                 "name": "conveyor_belt_1_0",
                 "position": {"x": 3.0, "y": 8.7, "z": 0.4},
+                "empty": True,
             },
             {
                 "name": "conveyor_belt_1_1",
                 "position": {"x": 0.0, "y": 8.7, "z": 0.4},
+                "empty": True,
             },
             {
                 "name": "conveyor_belt_1_2",
                 "position": {"x": -3.0, "y": 8.7, "z": 0.4},
+                "empty": True,
             },
         ],
     },

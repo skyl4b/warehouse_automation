@@ -1,6 +1,10 @@
-# Request part
-uint32 task_uid
-string entity
+# Confirm task protocol
+#
+# Defines a service to confirm a task to a robot in 
+# the warehouse automation project
+
+uint8 task_uid
+string robot
 ---
-# Response part
-bool task_confirmed
+bool confirmation
+wa_interfaces/Task task
