@@ -263,7 +263,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "n_robots",
-                default_value="0",
+                default_value="1",
                 description="The number of robots to be spawned immediatly",
             ),
             DeclareLaunchArgument(
@@ -278,6 +278,11 @@ def generate_launch_description() -> LaunchDescription:
                 description="For which robots should be moved automatically, "
                 "either a binary string, 'all' or 'not {index}'",
             ),
+            DeclareLaunchArgument(
+                "rviz",
+                default_value="False",
+                description="Start rviz to control the first robot",
+            ),
             # Gazebo server
             ExecuteProcess(
                 cmd=[
@@ -286,8 +291,6 @@ def generate_launch_description() -> LaunchDescription:
                     "libgazebo_ros_init.so",
                     "-s",
                     "libgazebo_ros_factory.so",
-                    # Start simulation paused
-                    "-u",
                     PathJoinSubstitution(
                         [
                             wa_environment,
@@ -321,6 +324,26 @@ def generate_launch_description() -> LaunchDescription:
             ),
             # Spawn robots
             OpaqueFunction(function=spawn_robots),
+            # Rviz for robot control and visualization
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution([
+                        FindPackageShare("nav2_bringup"),
+                        "launch",
+                        "rviz_launch.py",
+                    ]),
+                ),
+                launch_arguments={
+                    "namespace": "wa/mobilebot_1/",
+                    "use_namespace": "True",
+                    "rviz_config_file": PathJoinSubstitution([
+                        FindPackageShare("wa_environment"),
+                        "rviz",
+                        "mobilebot_1.rviz",
+                    ]),
+                }.items(),
+                condition=IfCondition(LaunchConfiguration("rviz")),
+            ),
             # Populate storage with inital boxes
             OpaqueFunction(function=populate_storage),
         ],

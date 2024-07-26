@@ -8,7 +8,6 @@ a robot's movement in the warehouse automation project.
 from __future__ import annotations
 
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 from launch import LaunchDescription
 from launch.actions import (

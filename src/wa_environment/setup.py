@@ -49,7 +49,7 @@ setup(
                 f"share/{package_name}/{folder}",
                 [str(path) for path in (source_dir / folder).iterdir()],
             )
-            for folder in ("launch", "maps", "params", "robots")
+            for folder in ("launch", "maps", "params", "robots", "rviz")
         ],
     ],
     install_requires=["setuptools"],
