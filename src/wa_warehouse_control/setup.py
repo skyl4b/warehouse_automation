@@ -30,6 +30,7 @@ setup(
     license="MIT",
     entry_points={
         "console_scripts": [
+            f"demand_generator = {name}.demand_generator:main",
             f"task_transmitter = {name}.task_transmitter:main",
             f"conveyor_belt = {name}.conveyor_belt:main",
             f"mobile_bot = {name}.mobile_bot:main",
