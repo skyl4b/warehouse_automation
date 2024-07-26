@@ -32,7 +32,7 @@ setup(
     license="MIT",
     entry_points={
         "console_scripts": [
-            f"gazebo_bridge = {name}.gazebo_bridge:main",
+            f"gazebo_bridge = {name}.bridge:main",
         ],
     },
 )
