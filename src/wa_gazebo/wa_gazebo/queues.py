@@ -163,7 +163,11 @@ class GazeboQueueHandler:
             except Empty:
                 pass
         # Attach models
-        elif not self.queue.attacher.empty() and self.queue.spawn_counter == 0:
+        elif (
+            not self.queue.attacher.empty()
+            and self.queue.spawn_counter == 0
+            and self.queue.detach_counter == 0
+        ):
             try:
                 while True:
                     task = self.queue.attacher.get_nowait()

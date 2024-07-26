@@ -97,6 +97,11 @@ class GazeboBridge(Node):
             "/wa/box/send",
             self.box_send_callback,
         )
+        self.create_service(
+            wa_srvs.BoxTransfer,
+            "/wa/box/transfer",
+            self.box_transfer_callback,
+        )
 
         self.get_logger().info("Gazebo bridge ready")
 
@@ -306,6 +311,37 @@ class GazeboBridge(Node):
                 name=f"product_box_{id_}",
             ),
             wa_srvs.Destroy.Response(),
+        )
+
+        return response
+
+    def box_transfer_callback(
+        self,
+        request: wa_srvs.BoxTransfer.Request,
+        response: wa_srvs.BoxTransfer.Response,
+    ) -> wa_srvs.BoxTransfer.Response:
+        """Transfer a box between entities in Gazebo."""
+        id_ = request.box_id
+        if id_ not in self.box_ids:
+            self.get_logger().warning(
+                f"Unknown box_id '{id_}' received.",
+            )
+        # Detach
+        self.queue_handler.enqueue_detach_callback(
+            wa_srvs.ToggleAttach.Request(
+                model_1=f"{request.from_entity}",
+                model_2=f"product_box_{id_}",
+            ),
+            wa_srvs.ToggleAttach.Response(),
+        )
+
+        # Attach
+        self.queue_handler.enqueue_attach_callback(
+            wa_srvs.ToggleAttach.Request(
+                model_1=f"{request.to_entity}",
+                model_2=f"product_box_{id_}",
+            ),
+            wa_srvs.ToggleAttach.Response(),
         )
 
         return response

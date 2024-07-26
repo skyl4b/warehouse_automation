@@ -1,0 +1,11 @@
+# Box transfer protocol
+#
+# Defines a service to request a box to be transferred to or from
+# a robot. In the warehouse automation project, this represents
+# a detach and attach sequence of commands.
+
+uint8 box_id
+string from_entity
+string to_entity
+---
+
