@@ -132,6 +132,7 @@ class BoxSpawner(Node):
 
 
 def main() -> None:
+    """Run the box_spawner node."""
     rclpy.init()
     node = BoxSpawner(
         [
@@ -145,11 +146,16 @@ def main() -> None:
             },
         ],
     )
-    node.spawn()
-    while not node.done():
-        rclpy.spin_once(node)
-    node.destroy_node()
-    rclpy.shutdown()
+
+    try:
+        node.spawn()
+        while not node.done():
+            rclpy.spin_once(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

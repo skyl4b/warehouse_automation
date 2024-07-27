@@ -358,9 +358,14 @@ def main() -> None:
     """Run the GazeboBridge node."""
     rclpy.init()
     node = GazeboBridge()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
