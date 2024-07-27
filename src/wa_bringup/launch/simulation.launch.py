@@ -7,6 +7,7 @@ the base nodes required for it to function.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 import yaml
 from launch_ros.actions import Node
@@ -35,8 +36,15 @@ from launch.substitutions import (
     PythonExpression,
 )
 
+NAMESPACE: Final[str] = "/wa"
+"""Global namespace for the project nodes."""
+
 # Define the robot spawning space
-Y_MIN, Y_MAX = -6, 6
+Y_MIN: Final[float] = -6.0
+"""Minimum y position to spawn."""
+
+Y_MAX: Final[float] = 6.0
+"""Maximum y position to spawn."""
 
 
 def generate_radial_points(
@@ -102,7 +110,7 @@ def spawn_robots(
                     f"mobilebot_{i + 1}",
                     # Namespace
                     "-robot_namespace",
-                    f"/wa/mobilebot_{i + 1}",
+                    f"{NAMESPACE}/mobilebot_{i + 1}",
                     # Pose
                     "-y",
                     str(y[i]),
@@ -113,7 +121,7 @@ def spawn_robots(
                 package="robot_state_publisher",
                 executable="robot_state_publisher",
                 name="robot_state_publisher",
-                namespace=f"/wa/mobilebot_{i + 1}",
+                namespace=f"{NAMESPACE}/mobilebot_{i + 1}",
                 parameters=[
                     {
                         "use_sim_time": True,
@@ -138,7 +146,8 @@ def spawn_robots(
                     ]),
                 ),
                 launch_arguments={
-                    "namespace": f"wa/mobilebot_{i + 1}",
+                    # Nav2 does not accept namespaces starting with '/'
+                    "namespace": f"{NAMESPACE.lstrip('/')}/mobilebot_{i + 1}",
                     "use_namespace": "True",
                     "slam": "False",
                     "map": PathJoinSubstitution([
@@ -157,6 +166,17 @@ def spawn_robots(
                     "use_respawn": "True",
                 }.items(),
                 condition=IfCondition(str(automatic_navigation_i)),
+            ),
+            Node(
+                package="wa_warehouse_control",
+                executable="mobilebot",
+                name=f"mobilebot_{i + 1}",
+                output="screen",
+                namespace=NAMESPACE,
+                parameters=[{"initial_position": [0.0, y[i]]}],
+                condition=IfCondition(
+                    LaunchConfiguration("warehouse_automation"),
+                ),
             ),
         ])
         for i, automatic_navigation_i in zip(
@@ -193,11 +213,10 @@ def populate_storage(context: LaunchContext) -> list[Node]:
 
     return [
         Node(
-            condition=IfCondition(str(len(populate) != 0)),
             package="wa_bringup",
             executable="box_spawner",
             name="box_spawner",
-            namespace="/wa/",
+            namespace=NAMESPACE,
             parameters=[
                 {
                     "box_spawns": yaml.safe_dump([
@@ -217,6 +236,7 @@ def populate_storage(context: LaunchContext) -> list[Node]:
                     ]),
                 },
             ],
+            condition=IfCondition(str(len(populate) != 0)),
         ),
     ]
 
@@ -260,6 +280,12 @@ def generate_launch_description() -> LaunchDescription:
                 "headless",
                 default_value="False",
                 description="Run in headless mode",
+            ),
+            DeclareLaunchArgument(
+                "warehouse_automation",
+                default_value="True",
+                description="Whether the warehouse automation should be "
+                "initialized, spawn moves, create tasks, allocate robots.",
             ),
             DeclareLaunchArgument(
                 "n_robots",
@@ -320,7 +346,7 @@ def generate_launch_description() -> LaunchDescription:
                 executable="gazebo_bridge",
                 name="gazebo_bridge",
                 output="screen",
-                namespace="/wa/",
+                namespace=NAMESPACE,
             ),
             # Spawn robots
             OpaqueFunction(function=spawn_robots),
@@ -334,10 +360,10 @@ def generate_launch_description() -> LaunchDescription:
                     ]),
                 ),
                 launch_arguments={
-                    "namespace": "wa/mobilebot_1/",
+                    "namespace": f"{NAMESPACE}/mobilebot_1/",
                     "use_namespace": "True",
                     "rviz_config_file": PathJoinSubstitution([
-                        FindPackageShare("wa_environment"),
+                        wa_environment,
                         "rviz",
                         "mobilebot_1.rviz",
                     ]),
@@ -346,5 +372,26 @@ def generate_launch_description() -> LaunchDescription:
             ),
             # Populate storage with inital boxes
             OpaqueFunction(function=populate_storage),
+            # Start warehouse automation
+            Node(
+                package="wa_warehouse_control",
+                executable="task_transmitter",
+                name="task_transmitter",
+                output="screen",
+                namespace=NAMESPACE,
+                condition=IfCondition(
+                    LaunchConfiguration("warehouse_automation"),
+                ),
+            ),
+            Node(
+                package="wa_warehouse_control",
+                executable="demand_generator",
+                name="demand_generator",
+                output="screen",
+                namespace=NAMESPACE,
+                condition=IfCondition(
+                    LaunchConfiguration("warehouse_automation"),
+                ),
+            ),
         ],
     )

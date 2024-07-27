@@ -5,10 +5,34 @@ from typing import TYPE_CHECKING, ClassVar, Final, Literal, cast
 
 import rclpy
 from geometry_msgs import msg as geometry_msgs
+from nav2_msgs.action import (
+    AssistedTeleop,
+    BackUp,
+    ComputePathThroughPoses,
+    ComputePathToPose,
+    FollowPath,
+    FollowWaypoints,
+    NavigateThroughPoses,
+    NavigateToPose,
+    SmoothPath,
+    Spin,
+)
+from nav2_msgs.srv import (
+    ClearEntireCostmap,
+    GetCostmap,
+    LoadMap,
+)
 from nav2_simple_commander.robot_navigator import BasicNavigator
 from nav_msgs import msg as nav_msgs
 from rcl_interfaces.msg import SetParametersResult
+from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+)
 from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
@@ -25,6 +49,112 @@ CLOSE_RADIUS: Final[float] = 0.5
 
 CONVEYOR_BELT_Y_DELTA: Final[float] = 0.8
 """Delta for the pick up point of a conveyor belt."""
+
+
+# HACK: BasicNavigator uses global arguments, so, if we remap the name
+# of a node that uses it, the navigator will be remapped as well, breaking
+# the mapping of topics.
+class Navigator(BasicNavigator):
+    """Override the initialization of the nav2 navigator."""
+
+    name: ClassVar[str] = "basic_navigator"
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa/mobilebot_1"
+    """Default node namespace."""
+
+    def __init__(
+        self,
+        name: str | None = None,
+        namespace: str | None = None,
+    ) -> None:
+        """Override the initialization of the BasicNavigator node."""
+        super(BasicNavigator, self).__init__(  # type: ignore[reportArgumentType]
+            node_name=name if name is not None else self.name,
+            namespace=namespace if namespace is not None else self.namespace,
+            use_global_arguments=False,
+        )
+
+        self.initial_pose = geometry_msgs.PoseStamped()
+        self.initial_pose.header.frame_id = "map"
+        self.goal_handle = None
+        self.result_future = None
+        self.feedback = None
+        self.status = None
+
+        amcl_pose_qos = QoSProfile(
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+
+        self.initial_pose_received = False
+        self.nav_through_poses_client = ActionClient(
+            self,
+            NavigateThroughPoses,
+            "navigate_through_poses",
+        )
+        self.nav_to_pose_client = ActionClient(
+            self,
+            NavigateToPose,
+            "navigate_to_pose",
+        )
+        self.follow_waypoints_client = ActionClient(
+            self,
+            FollowWaypoints,
+            "follow_waypoints",
+        )
+        self.follow_path_client = ActionClient(self, FollowPath, "follow_path")
+        self.compute_path_to_pose_client = ActionClient(
+            self,
+            ComputePathToPose,
+            "compute_path_to_pose",
+        )
+        self.compute_path_through_poses_client = ActionClient(
+            self,
+            ComputePathThroughPoses,
+            "compute_path_through_poses",
+        )
+        self.smoother_client = ActionClient(self, SmoothPath, "smooth_path")
+        self.spin_client = ActionClient(self, Spin, "spin")
+        self.backup_client = ActionClient(self, BackUp, "backup")
+        self.assisted_teleop_client = ActionClient(
+            self,
+            AssistedTeleop,
+            "assisted_teleop",
+        )
+        self.localization_pose_sub = self.create_subscription(
+            geometry_msgs.PoseWithCovarianceStamped,
+            "amcl_pose",
+            self._amclPoseCallback,
+            amcl_pose_qos,
+        )
+        self.initial_pose_pub = self.create_publisher(
+            geometry_msgs.PoseWithCovarianceStamped,
+            "initialpose",
+            10,
+        )
+        self.change_maps_srv = self.create_client(
+            LoadMap,
+            "map_server/load_map",
+        )
+        self.clear_costmap_global_srv = self.create_client(
+            ClearEntireCostmap,
+            "global_costmap/clear_entirely_global_costmap",
+        )
+        self.clear_costmap_local_srv = self.create_client(
+            ClearEntireCostmap,
+            "local_costmap/clear_entirely_local_costmap",
+        )
+        self.get_costmap_global_srv = self.create_client(
+            GetCostmap,
+            "global_costmap/get_costmap",
+        )
+        self.get_costmap_local_srv = self.create_client(
+            GetCostmap,
+            "local_costmap/get_costmap",
+        )
 
 
 class Mobilebot(Node):
@@ -53,7 +183,7 @@ class Mobilebot(Node):
     task: wa_msgs.Task | None
     """The task the robot is currently executing."""
 
-    navigator: BasicNavigator
+    navigator: Navigator
     """Robot automatic navigation."""
 
     # TODO: automaton
@@ -75,13 +205,30 @@ class Mobilebot(Node):
         self.declare_parameter("initial_position", initial_position)
         self.add_on_set_parameters_callback(self.parameters_set_callback)
 
+        # Clients
+        self.confirmation = self.create_client(
+            wa_srvs.TaskConfirmation,
+            "task_transmitter/task_confirmation",
+        )
+        self.box_transfer = self.create_client(
+            wa_srvs.BoxTransfer,
+            "box/transfer",
+        )
+        while not (
+            self.confirmation.wait_for_service(5.0)
+            and self.box_transfer.wait_for_service(5.0)
+        ):
+            self.get_logger().info(
+                "Waiting for task_transmitter and box_order services",
+            )
+
         # Initialize robot tracker
         self.pose = geometry_msgs.Pose()
         self.task = None
         self.goal_status = "idle"
 
         # Robot navigator
-        self.navigator = BasicNavigator(
+        self.navigator = Navigator(
             namespace=f"{self.get_namespace()}/{self.get_name()}",
         )
         self.set_initial_position(self.initial_position)
@@ -107,16 +254,6 @@ class Mobilebot(Node):
             10,
         )
 
-        # Clients
-        self.confirmation = self.create_client(
-            wa_srvs.TaskConfirmation,
-            "task_transmitter/task_confirmation",
-        )
-        self.box_transfer = self.create_client(
-            wa_srvs.BoxTransfer,
-            "box/transfer",
-        )
-
         # Outputs
         self.task_started = self.create_publisher(
             std_msgs.UInt8,
@@ -133,9 +270,6 @@ class Mobilebot(Node):
             "task/completed",
             10,
         )
-
-        while not self.confirmation.wait_for_service(5.0):
-            self.get_logger().info("Waiting for task_transmitter services")
 
     @property
     def goal_check_period(self) -> float:
