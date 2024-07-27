@@ -106,6 +106,11 @@ class Mobilebot(Node):
             "/wa/task/started",
             10,
         )
+        self.task_midpoint = self.create_publisher(
+            std_msgs.UInt8,
+            "/wa/task/midpoint",
+            10,
+        )
         self.task_completed = self.create_publisher(
             std_msgs.UInt8,
             "/wa/task/completed",
@@ -165,13 +170,14 @@ class Mobilebot(Node):
     def goal_check_callback(self) -> None:
         """Check if the robot has reached the goal."""
         if self.task is None:
-            # Return to idle position
-            if not self.is_close(0.0, 0.0, close_radius=2.0):
-                self.go_to(0.0, 0.0)
+            # Return to idle position on timer
+            # if not self.is_close(0.0, 0.0, close_radius=2.0):
+            #     self.go_to(0.0, 0.0)
             return
 
         if self.goal_status == "idle":
             self.goal_status = "to_start"
+            self.task_started.publish(std_msgs.UInt8(data=self.task.uid))
             self.go_to(
                 self.task.start.pose.position.x,
                 self.task.start.pose.position.y,
@@ -185,9 +191,15 @@ class Mobilebot(Node):
 
             def done_callback(_: rclpy.Future) -> None:
                 """Move to second goal."""
+                if self.task is None:
+                    self.get_logger().error(
+                        "No task to set midpoint, something went wrong",
+                    )
+                    return
+                self.task_midpoint.publish(std_msgs.UInt8(data=self.task.uid))
                 self.go_to(
-                    self.task.end.pose.position.x,  # type: ignore[reportAttributeAccessIssue]
-                    self.task.end.pose.position.y,  # type: ignore[reportAttributeAccessIssue]
+                    self.task.end.pose.position.x,
+                    self.task.end.pose.position.y,
                 )
                 self.goal_status = "to_end"
 
@@ -202,6 +214,12 @@ class Mobilebot(Node):
 
             def done_callback(_: rclpy.Future) -> None:
                 """Idle goal."""
+                if self.task is None:
+                    self.get_logger().error(
+                        "No task to set complete, something went wrong",
+                    )
+                    return
+                self.task_completed.publish(std_msgs.UInt8(data=self.task.uid))
                 self.goal_status = "idle"
                 self.task = None
 

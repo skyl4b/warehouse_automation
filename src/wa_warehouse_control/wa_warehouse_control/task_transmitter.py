@@ -69,6 +69,18 @@ class TaskTransmitter(Node):
             self.track_demand_callback,
             10,
         )
+        self.create_subscription(
+            std_msgs.UInt8,
+            "/wa/task/midpoint",
+            self.task_midpoint_callback,
+            10,
+        )
+        self.create_subscription(
+            std_msgs.UInt8,
+            "/wa/task/completed",
+            self.task_completed_callback,
+            10,
+        )
 
         # Timers
         self.create_timer(broadcast_period, self.broadcast_callback)
@@ -134,6 +146,21 @@ class TaskTransmitter(Node):
 
         self.get_logger().info(f"Broadcasting task {self.task.uid}")
         self.broadcast.publish(std_msgs.UInt8(data=self.task.uid))
+
+    def task_midpoint_callback(self, message: std_msgs.UInt8) -> None:
+        """Update the box ids and full status for the task."""
+
+    def task_completed_callback(self, message: std_msgs.UInt8) -> None:
+        """Update the box ids and full status for the task, set as complete."""
+        # Remove from active tasks
+        for i in range(len(self.active_tasks)):
+            if self.active_tasks[i].uid == message.data:
+                self.active_tasks.pop(i)
+                self.get_logger().info(f"Task {message.data} completed")
+                return
+        self.get_logger().warn(
+            f"Task {message.data} not found, can't complete",
+        )
 
     def generate_task(self) -> Task | None:
         """Generate an input or output task according to demand."""
@@ -341,6 +368,10 @@ class TaskTransmitter(Node):
 
     def set_box_id_callback(self, future: rclpy.Future) -> None:
         """Set the box_id of the current task."""
+        if self.task is None:
+            self.get_logger().error("Cannot set box_id, no task currently.")
+            return
+
         result = cast(wa_srvs.BoxOrder.Response, future.result())
         self.task_box_id = result.box_id
 
@@ -350,10 +381,11 @@ class TaskTransmitter(Node):
         for storage_unit in map_["storage_units"]:
             if storage_unit["name"] == self.task.end["name"]:
                 storage_unit["box_id"] = result.box_id
+                self.update_map(map_)
                 return
         self.get_logger().error(
             "Couldn't find storage_unit "
-            f"'{self.task.end['name']}' to set box_id"
+            f"'{self.task.end['name']}' to set box_id",
         )
 
 
