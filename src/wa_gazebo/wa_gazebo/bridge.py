@@ -23,7 +23,10 @@ class GazeboBridge(Node):
     """A node to streamline the interactions with the Gazebo simulator."""
 
     name: ClassVar[str] = "gazebo_bridge"
-    """Node name."""
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa"
+    """Default node namespace."""
 
     gazebo_actions: GazeboActions
     """Gazebo simulation control and model management."""
@@ -38,7 +41,10 @@ class GazeboBridge(Node):
     """Process Gazebo actions in batches."""
 
     def __init__(self) -> None:
-        super().__init__(self.name)  # type: ignore[reportArgumentType]
+        super().__init__(  # type: ignore[reportArgumentType]
+            node_name=self.name,
+            namespace=self.namespace,
+        )
 
         # Connect to services
         self.gazebo_actions = GazeboActions(self)
@@ -65,41 +71,41 @@ class GazeboBridge(Node):
         # Spawner & destroyer
         self.create_service(
             wa_srvs.Spawn,
-            f"/wa/{self.name}/spawn",
+            f"{self.get_name()}/spawn",
             self.queue_handler.enqueue_spawn_callback,
         )
         self.create_service(
             wa_srvs.Destroy,
-            f"/wa/{self.name}/destroy",
+            f"{self.get_name()}/destroy",
             self.queue_handler.enqueue_destroy_callback,
         )
 
         # Attach & detach
         self.create_service(
             wa_srvs.ToggleAttach,
-            f"/wa/{self.name}/attach",
+            f"{self.get_name()}/attach",
             self.queue_handler.enqueue_attach_callback,
         )
         self.create_service(
             wa_srvs.ToggleAttach,
-            f"/wa/{self.name}/detach",
+            f"{self.get_name()}/detach",
             self.queue_handler.enqueue_detach_callback,
         )
 
         # High level interactions
         self.create_service(
             wa_srvs.BoxOrder,
-            "/wa/box/order",
+            "box/order",
             self.box_order_callback,
         )
         self.create_service(
             wa_srvs.BoxSend,
-            "/wa/box/send",
+            "box/send",
             self.box_send_callback,
         )
         self.create_service(
             wa_srvs.BoxTransfer,
-            "/wa/box/transfer",
+            "box/transfer",
             self.box_transfer_callback,
         )
 

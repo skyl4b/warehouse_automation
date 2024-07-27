@@ -21,7 +21,10 @@ class DemandGenerator(Node):
     """Generates the demand of tasks in random intervals."""
 
     name: ClassVar[str] = "demand_generator"
-    """Node name."""
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa"
+    """Default node namespace."""
 
     input_demand: int
     """Current input demand."""
@@ -41,7 +44,10 @@ class DemandGenerator(Node):
         max_demand_period: float,
         input_probability: float = 0.5,
     ) -> None:
-        super().__init__(self.name)  # type: ignore[reportArgumentType]
+        super().__init__(  # type: ignore[reportArgumentType]
+            node_name=self.name,
+            namespace=self.namespace,
+        )
 
         # Initialize demand
         self.input_demand = 0
@@ -64,7 +70,7 @@ class DemandGenerator(Node):
         # Publishers
         self.demand_publisher = self.create_publisher(
             wa_msgs.Demand,
-            f"/wa/{self.name}/demand",
+            f"{self.get_name()}/demand",
             10,
         )
 
@@ -72,7 +78,7 @@ class DemandGenerator(Node):
         for type_ in ("input", "output"):
             self.create_service(
                 std_srvs.Empty,
-                f"/wa/{self.name}/consume/{type_}",
+                f"{self.get_name()}/consume/{type_}",
                 lambda request, response, type_=type_: self.consume(
                     request,  # type: ignore[reportArgumentType]
                     response,

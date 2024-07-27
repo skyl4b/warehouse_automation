@@ -28,7 +28,10 @@ class TaskTransmitter(Node):
     """
 
     name: ClassVar[str] = "task_transmitter"
-    """Node name."""
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa"
+    """Default node namespace."""
 
     input_demand: int
     """Current input demand."""
@@ -46,7 +49,10 @@ class TaskTransmitter(Node):
     """Active tasks being executed by robots."""
 
     def __init__(self, broadcast_period: float, map_: Map) -> None:
-        super().__init__(self.name)  # type: ignore[reportArgumentType]
+        super().__init__(  # type: ignore[reportArgumentType]
+            node_name=self.name,
+            namespace=self.namespace,
+        )
 
         # Demand tracker
         self.input_demand = 0
@@ -65,19 +71,19 @@ class TaskTransmitter(Node):
         # Subscribers
         self.create_subscription(
             wa_msgs.Demand,
-            "/wa/demand_generator/demand",
+            "demand_generator/demand",
             self.track_demand_callback,
             10,
         )
         self.create_subscription(
             std_msgs.UInt8,
-            "/wa/task/midpoint",
+            "task/midpoint",
             self.task_midpoint_callback,
             10,
         )
         self.create_subscription(
             std_msgs.UInt8,
-            "/wa/task/completed",
+            "task/completed",
             self.task_completed_callback,
             10,
         )
@@ -88,18 +94,18 @@ class TaskTransmitter(Node):
         # Publishers
         self.broadcast = self.create_publisher(
             std_msgs.UInt8,
-            f"/wa/{self.name}/broadcast",
+            f"{self.get_name()}/broadcast",
             10,
         )
 
         # Clients
         self.box_order = self.create_client(
             wa_srvs.BoxOrder,
-            "/wa/box/order",
+            "box/order",
         )
         self.box_send = self.create_client(
             wa_srvs.BoxSend,
-            "/wa/box/send",
+            "box/send",
         )
         while not (
             self.box_order.wait_for_service(5.0)
@@ -110,7 +116,7 @@ class TaskTransmitter(Node):
         # Services
         self.confirm = self.create_service(
             wa_srvs.TaskConfirmation,
-            f"/wa/{self.name}/task_confirmation",
+            f"{self.get_name()}/task_confirmation",
             self.confirmation_callback,
         )
 

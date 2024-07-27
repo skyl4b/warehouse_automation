@@ -33,8 +33,11 @@ class Mobilebot(Node):
     is responsible for accepting tasks and managing the robot.
     """
 
-    name: ClassVar[str] = "mobilebot"
-    """Node name."""
+    name: ClassVar[str] = "mobilebot_1"
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa"
+    """Default node namespace."""
 
     confirmation: Client
     """Task confirmation client."""
@@ -56,14 +59,18 @@ class Mobilebot(Node):
     """Current goal status."""
 
     def __init__(self, goal_check_period: float = 0.2) -> None:
-        super().__init__(self.name)  # type: ignore[reportArgumentType]
+        super().__init__(  # type: ignore[reportArgumentType]
+            node_name=self.name,
+            namespace=self.namespace,
+        )
 
         # Parameters
         self.declare_parameter("goal_check_period", goal_check_period)
         # Initialize robot tracker
         self.pose = geometry_msgs.Pose()
-        # TODO: fix hardcode namespace
-        self.navigator = BasicNavigator(namespace="/wa/mobilebot_1")
+        self.navigator = BasicNavigator(
+            namespace=f"{self.get_namespace()}/{self.get_name()}",
+        )
         # TODO: set initial pose
         self.navigator.waitUntilNav2Active()
         self.task = None
@@ -78,14 +85,13 @@ class Mobilebot(Node):
         # Subscriptions
         self.create_subscription(
             std_msgs.UInt8,
-            "/wa/task_transmitter/broadcast",
+            "task_transmitter/broadcast",
             self.broadcast_callback,
             1,
         )
         self.create_subscription(
             nav_msgs.Odometry,
-            # TODO: fix hardcode namespace
-            "/wa/mobilebot_1/odom",
+            f"{self.get_name()}/odom",
             self.pose_tracker_callback,
             10,
         )
@@ -93,27 +99,27 @@ class Mobilebot(Node):
         # Clients
         self.confirmation = self.create_client(
             wa_srvs.TaskConfirmation,
-            "/wa/task_transmitter/task_confirmation",
+            "task_transmitter/task_confirmation",
         )
         self.box_transfer = self.create_client(
             wa_srvs.BoxTransfer,
-            "/wa/box/transfer",
+            "box/transfer",
         )
 
         # Outputs
         self.task_started = self.create_publisher(
             std_msgs.UInt8,
-            "/wa/task/started",
+            "task/started",
             10,
         )
         self.task_midpoint = self.create_publisher(
             std_msgs.UInt8,
-            "/wa/task/midpoint",
+            "task/midpoint",
             10,
         )
         self.task_completed = self.create_publisher(
             std_msgs.UInt8,
-            "/wa/task/completed",
+            "task/completed",
             10,
         )
 
@@ -275,8 +281,7 @@ class Mobilebot(Node):
             wa_srvs.BoxTransfer.Request(
                 box_id=self.task.box_id,
                 from_entity=from_entity,
-                # TODO: use name
-                to_entity="mobilebot_1",
+                to_entity=self.get_name(),
             ),
         )
 
@@ -288,8 +293,7 @@ class Mobilebot(Node):
         return self.box_transfer.call_async(
             wa_srvs.BoxTransfer.Request(
                 box_id=self.task.box_id,
-                # TODO: use name
-                from_entity="mobilebot_1",
+                from_entity=self.get_name(),
                 to_entity=to_entity,
             ),
         )
