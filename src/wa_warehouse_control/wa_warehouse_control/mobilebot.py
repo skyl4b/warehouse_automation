@@ -7,6 +7,7 @@ import rclpy
 from geometry_msgs import msg as geometry_msgs
 from nav2_simple_commander.robot_navigator import BasicNavigator
 from nav_msgs import msg as nav_msgs
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
@@ -14,6 +15,7 @@ from wa_interfaces import srv as wa_srvs
 
 if TYPE_CHECKING:
     from rclpy.client import Client
+    from rclpy.parameter import Parameter
 
 NAVIGATION_FRAME_ID: Final[str] = "map"
 """Relative frame for the automatic navigation."""
@@ -58,7 +60,11 @@ class Mobilebot(Node):
     goal_status: Literal["idle", "to_start", "to_end", "pick_box", "drop_box"]
     """Current goal status."""
 
-    def __init__(self, goal_check_period: float = 0.2) -> None:
+    def __init__(
+        self,
+        goal_check_period: float = 0.2,
+        initial_position: tuple[float, float] = (0.0, 0.0),
+    ) -> None:
         super().__init__(  # type: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
@@ -66,15 +72,20 @@ class Mobilebot(Node):
 
         # Parameters
         self.declare_parameter("goal_check_period", goal_check_period)
+        self.declare_parameter("initial_position", initial_position)
+        self.add_on_set_parameters_callback(self.parameters_set_callback)
+
         # Initialize robot tracker
         self.pose = geometry_msgs.Pose()
+        self.task = None
+        self.goal_status = "idle"
+
+        # Robot navigator
         self.navigator = BasicNavigator(
             namespace=f"{self.get_namespace()}/{self.get_name()}",
         )
-        # TODO: set initial pose
+        self.set_initial_position(self.initial_position)
         self.navigator.waitUntilNav2Active()
-        self.task = None
-        self.goal_status = "idle"
 
         # Timers
         self.create_timer(
@@ -130,6 +141,54 @@ class Mobilebot(Node):
     def goal_check_period(self) -> float:
         """Goal check period of the robot."""
         return self.get_parameter("goal_check_period").value  # type: ignore[reportIncompatibleType]
+
+    @property
+    def initial_position(self) -> tuple[float, float]:
+        """Initial position of the robot."""
+        return self.get_parameter("initial_position").value  # type: ignore[reportIncompatibleType]
+
+    def parameters_set_callback(
+        self,
+        parameters: list[Parameter],
+    ) -> SetParametersResult:
+        for parameter in parameters:
+            if parameter.name == "initial_position":
+                value = list(cast(list[float], parameter.value))
+                if len(value) != 2:  # noqa: PLR2004
+                    self.get_logger().warn(
+                        f"Unable to set initial_position to: {value}",
+                    )
+                    return SetParametersResult(
+                        successful=False,
+                        reason="initial_position must have two elements.",
+                    )
+                self.get_logger().info(
+                    f"initial_position set to: {value}",
+                )
+                self.set_initial_position((value[0], value[1]))
+
+        return SetParametersResult(successful=True)
+
+    def set_initial_position(
+        self,
+        initial_position: tuple[float, float],
+    ) -> None:
+        """Set the robot's initial position."""
+        x, y = initial_position
+        self.navigator.setInitialPose(
+            geometry_msgs.PoseStamped(
+                header=std_msgs.Header(
+                    stamp=self.get_clock().now().to_msg(),
+                    frame_id=NAVIGATION_FRAME_ID,
+                ),
+                pose=geometry_msgs.Pose(
+                    position=geometry_msgs.Point(
+                        x=x,
+                        y=y,
+                    ),
+                ),
+            ),
+        )
 
     def pose_tracker_callback(self, message: nav_msgs.Odometry) -> None:
         """Track the robot's pose from its odometry."""
