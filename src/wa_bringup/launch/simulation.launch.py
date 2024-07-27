@@ -150,7 +150,7 @@ def spawn_robots(
                     "params_file": PathJoinSubstitution([
                         FindPackageShare("wa_environment"),
                         "params",
-                        f"nav2_params_all_{i + 1}.yaml",
+                        "nav2_params_all.yaml",
                     ]),
                     "autostart": "True",
                     "use_composition": "False",
