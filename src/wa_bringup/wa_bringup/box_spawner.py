@@ -28,13 +28,20 @@ class BoxSpawner(Node):
     """A simple node to spawn boxes in the warehouse automation project."""
 
     name: ClassVar[str] = "box_spawner"
-    """Node name."""
+    """Default node name."""
+
+    namespace: ClassVar[str] = "/wa"
+    """Default node namespace."""
 
     def __init__(
         self,
         box_spawns: list[BoxSpawnRequest] | BoxSpawnRequest | None = None,
     ) -> None:
-        super().__init__(self.name)  # type: ignore[reportArgumentType]
+        super().__init__(  # type: ignore[reportArgumentType]
+            node_name=self.name,
+            namespace=self.namespace,
+        )
+
         if box_spawns is None:
             box_spawns = [
                 {"position": {"x": 0.0, "y": 0.0, "z": 0.0}, "attach_to": ""},
@@ -48,7 +55,7 @@ class BoxSpawner(Node):
         # Spawner service
         self.spawner = self.create_client(
             wa_srvs.BoxOrder,
-            "/wa/box/order",
+            "box/order",
         )
         while not self.spawner.wait_for_service(timeout_sec=5.0):
             self.get_logger().info("Waiting for box spawner service")
@@ -111,10 +118,6 @@ class BoxSpawner(Node):
             self._set_done()
             return
 
-        # self._spawn_next_box(
-        #     len(self.box_spawns) - 1,
-        #     callback=lambda _: self._set_done(),
-        # )
         for box_spawn in self.box_spawns:
             self.spawner.call_async(
                 wa_srvs.BoxOrder.Request(
