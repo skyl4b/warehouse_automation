@@ -21,6 +21,9 @@ NAVIGATION_FRAME_ID: Final[str] = "map"
 CLOSE_RADIUS: Final[float] = 0.5
 """Radius to consider the robot able to pick up a box."""
 
+CONVEYOR_BELT_Y_DELTA: Final[float] = 0.8
+"""Delta for the pick up point of a conveyor belt."""
+
 
 class Mobilebot(Node):
     """A mobile robot in the warehouse automation project.
@@ -49,10 +52,10 @@ class Mobilebot(Node):
     """Robot automatic navigation."""
 
     # TODO: automaton
-    goal_status: Literal["idle", "to_start", "to_end"]
+    goal_status: Literal["idle", "to_start", "to_end", "pick_box", "drop_box"]
     """Current goal status."""
 
-    def __init__(self, goal_check_period: float = 0.5) -> None:
+    def __init__(self, goal_check_period: float = 0.2) -> None:
         super().__init__(self.name)  # type: ignore[reportArgumentType]
 
         # Parameters
@@ -100,12 +103,12 @@ class Mobilebot(Node):
         # Outputs
         self.task_started = self.create_publisher(
             std_msgs.UInt8,
-            f"/wa/{self.get_name()}/task/started",
+            "/wa/task/started",
             10,
         )
         self.task_completed = self.create_publisher(
             std_msgs.UInt8,
-            f"/wa/{self.get_name()}/task/completed",
+            "/wa/task/completed",
             10,
         )
 
@@ -150,18 +153,21 @@ class Mobilebot(Node):
         # HACK: fix conveyor belt position (so that no collision happens)
         if self.task.start.name.startswith("conveyor_belt"):
             self.task.start.pose.position.y = round(
-                self.task.start.pose.position.y + 0.8,
+                self.task.start.pose.position.y + CONVEYOR_BELT_Y_DELTA,
                 ndigits=2,
             )
         if self.task.end.name.startswith("conveyor_belt"):
             self.task.end.pose.position.y = round(
-                self.task.end.pose.position.y - 0.8,
+                self.task.end.pose.position.y - CONVEYOR_BELT_Y_DELTA,
                 ndigits=2,
             )
 
     def goal_check_callback(self) -> None:
         """Check if the robot has reached the goal."""
         if self.task is None:
+            # Return to idle position
+            if not self.is_close(0.0, 0.0, close_radius=2.0):
+                self.go_to(0.0, 0.0)
             return
 
         if self.goal_status == "idle":
@@ -176,20 +182,31 @@ class Mobilebot(Node):
             self.task.start.pose.position.x,
             self.task.start.pose.position.y,
         ):
-            self.goal_status = "to_end"
-            self.pick_box(self.task.start.name).add_done_callback(
-                lambda _: self.go_to(
+
+            def done_callback(_: rclpy.Future) -> None:
+                """Move to second goal."""
+                self.go_to(
                     self.task.end.pose.position.x,  # type: ignore[reportAttributeAccessIssue]
                     self.task.end.pose.position.y,  # type: ignore[reportAttributeAccessIssue]
-                ),
+                )
+                self.goal_status = "to_end"
+
+            self.goal_status = "pick_box"
+            self.pick_box(self.task.start.name).add_done_callback(
+                done_callback,
             )
         elif self.goal_status == "to_end" and self.is_close(
             self.task.end.pose.position.x,
             self.task.end.pose.position.y,
         ):
-            self.goal_status = "to_end"
-            self.drop_box(self.task.end.name)
-            self.task = None
+
+            def done_callback(_: rclpy.Future) -> None:
+                """Idle goal."""
+                self.goal_status = "idle"
+                self.task = None
+
+            self.goal_status = "drop_box"
+            self.drop_box(self.task.end.name).add_done_callback(done_callback)
 
     def go_to(self, x: float, y: float) -> None:
         """Move the robot to a specific pose."""
@@ -220,11 +237,16 @@ class Mobilebot(Node):
             ),
         )
 
-    def is_close(self, x: float, y: float) -> bool:
+    def is_close(
+        self,
+        x: float,
+        y: float,
+        close_radius: float = CLOSE_RADIUS,
+    ) -> bool:
         """Return whether the robot is close to a point."""
         return (self.pose.position.x - x) ** 2 + (
             self.pose.position.y - y
-        ) ** 2 <= CLOSE_RADIUS**2
+        ) ** 2 <= close_radius**2
 
     def pick_box(self, from_entity: str) -> rclpy.Future:
         """Pick a box from an entity."""

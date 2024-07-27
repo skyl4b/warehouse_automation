@@ -7,6 +7,7 @@ import rclpy
 import yaml
 from geometry_msgs import msg as geometry_msgs
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
@@ -113,6 +114,12 @@ class TaskTransmitter(Node):
             self.get_parameter("map").value,  # type: ignore[reportIncompatibleType]
         )
 
+    def update_map(self, map_: Map) -> None:
+        """Update the map of the warehouse."""
+        self.set_parameters([
+            Parameter("map", Parameter.Type.STRING, yaml.safe_dump(map_)),
+        ])
+
     def track_demand_callback(self, demand: wa_msgs.Demand) -> None:
         """Track the current demand of the warehouse."""
         self.input_demand = demand.input_demand
@@ -131,27 +138,33 @@ class TaskTransmitter(Node):
     def generate_task(self) -> Task | None:
         """Generate an input or output task according to demand."""
         # Prioritize highest demand
-        demand, task_type = max(
+        high_demand, high_task_type = max(
+            (self.input_demand, "input"),
+            (self.output_demand, "output"),
+        )
+        low_demand, low_task_type = min(
             (self.input_demand, "input"),
             (self.output_demand, "output"),
         )
 
         # No tasks to do
-        if demand == 0:
+        if high_demand == 0:
             return None
+        task_type = high_task_type
 
         # Find conveyor belt and storage unit
-        storage_unit = self.find_storage_unit(empty=task_type == "input")
-        conveyor_belt = self.find_conveyor_belt(task_type)
-        if storage_unit is None or conveyor_belt is None:
-            storage_unit = self.find_storage_unit(empty=task_type == "output")
-            task_type = "input" if task_type == "output" else "output"
-            conveyor_belt = self.find_conveyor_belt(task_type)
+        map_ = self.map
+        resources = self.find_resources(high_task_type, map_)
+        if resources is None and low_demand > 0:
+            # Try lower priority demand
+            task_type = low_task_type
+            resources = self.find_resources(low_task_type, map_)
+        if resources is None:
+            # Can't do tasks right now
+            return None
+        conveyor_belt, storage_unit = resources
 
-            if storage_unit is None or conveyor_belt is None:
-                # Can't do tasks right now
-                return None
-
+        # Parse task type
         if task_type == "input":
             start = conveyor_belt
             end = storage_unit
@@ -165,13 +178,16 @@ class TaskTransmitter(Node):
                     attach_to=start["name"],
                 ),
             ).add_done_callback(self.set_box_id_callback)
-            # TODO: empty on midpoint
             start["empty"] = False
-            end["empty"] = False
+            end["box_id"] = -1  # Set to -1 for now, override with callback
         else:
             start = storage_unit
             end = conveyor_belt
+            # Output tasks should known the box ids on their start and occupy
+            # their target units even before arriving (prevent deadlock)
+            self.task_box_id = start["box_id"]
             end["empty"] = False
+        self.update_map(map_)
 
         # Generate task
         task = Task.create_task(start, end)
@@ -188,35 +204,88 @@ class TaskTransmitter(Node):
         )
         return task
 
+    def find_resources(
+        self,
+        task_type: Literal["input", "output"],
+        map_: Map | None = None,
+    ) -> tuple[ConveyorBelt, StorageUnit] | None:
+        """Find resources for a task, a conveyor belt and a storage unit."""
+        if map_ is None:
+            map_ = self.map
+
+        conveyor_belt = self.find_conveyor_belt(
+            task_type,
+            map_=map_,
+        )
+        storage_unit = None
+
+        # Find closest storage unit to conveyor belt
+        if conveyor_belt is not None:
+            storage_unit = self.find_storage_unit(
+                empty=task_type == "input",
+                map_=map_,
+                closest_to=(
+                    conveyor_belt["position"]["x"],
+                    conveyor_belt["position"]["y"],
+                ),
+            )
+
+        if conveyor_belt is None or storage_unit is None:
+            return None
+
+        return (conveyor_belt, storage_unit)
+
     def find_conveyor_belt(
         self,
         belt_type: Literal["input", "output"],
+        map_: Map | None = None,
     ) -> ConveyorBelt | None:
         """Find an available conveyor belt."""
-        for conveyor_belt in random.sample(
-            self.map["conveyor_belts"][belt_type],
-            k=len(self.map["conveyor_belts"][belt_type]),
-        ):
-            if conveyor_belt["empty"]:
-                return conveyor_belt
+        if map_ is None:
+            map_ = self.map
 
-        self.get_logger().warn("Conveyor belt not in use not found")
+        for i in random.sample(
+            range(len(map_["conveyor_belts"][belt_type])),
+            k=len(map_["conveyor_belts"][belt_type]),
+        ):
+            if map_["conveyor_belts"][belt_type][i]["empty"]:
+                return map_["conveyor_belts"][belt_type][i]
+
+        self.get_logger().warn(f"Empty {belt_type} conveyor belt not found")
         return None
 
     def find_storage_unit(
         self,
         empty: bool,
+        closest_to: tuple[float, float] | None = None,
+        map_: Map | None = None,
     ) -> StorageUnit | None:
         """Find an empty or full storage unit."""
-        # TODO: find closest
-        for storage_unit in random.sample(
-            self.map["storage_units"],
-            k=len(self.map["storage_units"]),
-        ):
-            if storage_unit["empty"] == empty:
-                return storage_unit
+        if map_ is None:
+            map_ = self.map
+        if closest_to is None:
+            # Choose center on unknown
+            closest_to = 0.0, 0.0
 
-        self.get_logger().warn(f"Storage unit with empty={empty} not found")
+        # Find closest free storage_unit
+        x, y = closest_to
+        for _, i in sorted(
+            (
+                (map_["storage_units"][i]["position"]["x"] - x) ** 2
+                + (map_["storage_units"][i]["position"]["y"] - y) ** 2,
+                i,
+            )
+            for i in range(len(map_["storage_units"]))
+        ):
+            # Ignore fallback box_ids
+            if map_["storage_units"][i]["box_id"] != -1 and (
+                empty == (map_["storage_units"][i]["box_id"] is None)
+            ):
+                return map_["storage_units"][i]
+
+        self.get_logger().warn(
+            f"{'Empty' if empty else 'Full'} storage unit not found",
+        )
         return None
 
     def confirmation_callback(
@@ -225,11 +294,17 @@ class TaskTransmitter(Node):
         response: wa_srvs.TaskConfirmation.Response,
     ) -> wa_srvs.TaskConfirmation.Response:
         """Confirm or not a task to a robot that requested it."""
-        if self.task is None or self.task.uid != request.task_uid:
+        if (
+            self.task is None
+            or self.task_box_id is None
+            or self.task_box_id == -1
+            or self.task.uid != request.task_uid
+        ):
             self.get_logger().info(
                 f"Denying task {request.task_uid} to {request.robot}",
             )
             response.confirmation = False
+            response.task.uid = request.task_uid
             return response
 
         self.get_logger().info(
@@ -268,6 +343,18 @@ class TaskTransmitter(Node):
         """Set the box_id of the current task."""
         result = cast(wa_srvs.BoxOrder.Response, future.result())
         self.task_box_id = result.box_id
+
+        # This callback should only be called on input tasks
+        # Set the unit to the box_id received
+        map_ = self.map
+        for storage_unit in map_["storage_units"]:
+            if storage_unit["name"] == self.task.end["name"]:
+                storage_unit["box_id"] = result.box_id
+                return
+        self.get_logger().error(
+            "Couldn't find storage_unit "
+            f"'{self.task.end['name']}' to set box_id"
+        )
 
 
 def main() -> None:

@@ -257,6 +257,7 @@ class GazeboBridge(Node):
         """Spawn a product box inside Gazebo at a point."""
         id_ = self.next_box_id()
         position = request.position
+        self.get_logger().info(f"Box {id_} ordered")
 
         # Spawn
         self.queue_handler.enqueue_spawn_callback(

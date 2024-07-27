@@ -36,7 +36,7 @@ class ConveyorBelts(TypedDict):
 class StorageUnit(Model):
     """A storage unit in the warehouse automation project."""
 
-    empty: bool
+    box_id: int | None
 
 
 class Map(TypedDict):
@@ -87,52 +87,52 @@ BASE_MAP: Final[Map] = {
         {
             "name": "storage_unit_0_0",
             "position": {"x": 1.5, "y": -6.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_1_0",
             "position": {"x": 1.5, "y": -3.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_2_0",
             "position": {"x": 1.5, "y": 0.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_3_0",
             "position": {"x": 1.5, "y": 3.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_4_0",
             "position": {"x": 1.5, "y": 6.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_0_1",
             "position": {"x": -1.5, "y": -6.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_1_1",
             "position": {"x": -1.5, "y": -3.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_2_1",
             "position": {"x": -1.5, "y": 0.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_3_1",
             "position": {"x": -1.5, "y": 3.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
         {
             "name": "storage_unit_4_1",
             "position": {"x": -1.5, "y": 6.0, "z": 0.28},
-            "empty": True,
+            "box_id": None,
         },
     ],
 }
