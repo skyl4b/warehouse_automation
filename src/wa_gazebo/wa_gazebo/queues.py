@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from queue import Queue
 from typing import TYPE_CHECKING, Callable, Final, Literal, cast
+
+from wa_interfaces import srv as wa_srvs
 
 if TYPE_CHECKING:
     import rclpy
     from rclpy.node import Node
-    from wa_interfaces import srv as wa_srvs
 
 QUEUE_HANDLER_PERIOD_S: Final[float] = 0.2
 """Period to call the queue handler in seconds."""

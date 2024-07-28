@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 NAVIGATION_FRAME_ID: Final[str] = "map"
 """Relative frame for the automatic navigation."""
 
-CLOSE_RADIUS: Final[float] = 0.5
+CLOSE_RADIUS: Final[float] = 1.0
 """Radius to consider the robot able to pick up a box."""
 
 CONVEYOR_BELT_Y_DELTA: Final[float] = 0.8
@@ -383,47 +383,83 @@ class Mobilebot(Node):
             )
             return
 
-        if self.goal_status == "to_start" and self.is_close(
-            self.task.start.pose.position.x,
-            self.task.start.pose.position.y,
-        ):
-
-            def done_callback(_: rclpy.Future) -> None:
-                """Move to second goal."""
-                if self.task is None:
-                    self.get_logger().error(
-                        "No task to set midpoint, something went wrong",
+        if self.goal_status == "to_start":
+            if not self.is_close(
+                self.task.start.pose.position.x,
+                self.task.start.pose.position.y,
+            ):
+                # Prevent robot getting lost during navigation
+                if self.navigator.isTaskComplete():
+                    # Try again
+                    self.get_logger().warn(
+                        "Robot got lost going to "
+                        "("
+                        f"x: {self.task.start.pose.position.x}, "
+                        f"y: {self.task.start.pose.position.y})",
                     )
-                    return
-                self.task_midpoint.publish(std_msgs.UInt8(data=self.task.uid))
-                self.go_to(
-                    self.task.end.pose.position.x,
-                    self.task.end.pose.position.y,
+                    self.go_to(
+                        self.task.start.pose.position.x,
+                        self.task.start.pose.position.y,
+                    )
+            else:
+
+                def done_callback(_: rclpy.Future) -> None:
+                    """Move to second goal."""
+                    if self.task is None:
+                        self.get_logger().error(
+                            "No task to set midpoint, something went wrong",
+                        )
+                        return
+                    self.task_midpoint.publish(
+                        std_msgs.UInt8(data=self.task.uid),
+                    )
+                    self.go_to(
+                        self.task.end.pose.position.x,
+                        self.task.end.pose.position.y,
+                    )
+                    self.goal_status = "to_end"
+
+                self.goal_status = "pick_box"
+                self.pick_box(self.task.start.name).add_done_callback(
+                    done_callback,
                 )
-                self.goal_status = "to_end"
-
-            self.goal_status = "pick_box"
-            self.pick_box(self.task.start.name).add_done_callback(
-                done_callback,
-            )
-        elif self.goal_status == "to_end" and self.is_close(
-            self.task.end.pose.position.x,
-            self.task.end.pose.position.y,
-        ):
-
-            def done_callback(_: rclpy.Future) -> None:
-                """Idle goal."""
-                if self.task is None:
-                    self.get_logger().error(
-                        "No task to set complete, something went wrong",
+        elif self.goal_status == "to_end":
+            if not self.is_close(
+                self.task.end.pose.position.x,
+                self.task.end.pose.position.y,
+            ):
+                # Prevent robot getting lost during navigation
+                if self.navigator.isTaskComplete():
+                    # Try again
+                    self.get_logger().warn(
+                        "Robot got lost going to "
+                        "("
+                        f"x: {self.task.end.pose.position.x}, "
+                        f"y: {self.task.end.pose.position.y})",
                     )
-                    return
-                self.task_completed.publish(std_msgs.UInt8(data=self.task.uid))
-                self.goal_status = "idle"
-                self.task = None
+                    self.go_to(
+                        self.task.end.pose.position.x,
+                        self.task.end.pose.position.y,
+                    )
+            else:
 
-            self.goal_status = "drop_box"
-            self.drop_box(self.task.end.name).add_done_callback(done_callback)
+                def done_callback(_: rclpy.Future) -> None:
+                    """Idle goal."""
+                    if self.task is None:
+                        self.get_logger().error(
+                            "No task to set complete, something went wrong",
+                        )
+                        return
+                    self.task_completed.publish(
+                        std_msgs.UInt8(data=self.task.uid),
+                    )
+                    self.goal_status = "idle"
+                    self.task = None
+
+                self.goal_status = "drop_box"
+                self.drop_box(self.task.end.name).add_done_callback(
+                    done_callback,
+                )
 
     def go_to(self, x: float, y: float) -> None:
         """Move the robot to a specific pose."""
@@ -468,8 +504,10 @@ class Mobilebot(Node):
     def pick_box(self, from_entity: str) -> rclpy.Future:
         """Pick a box from an entity."""
         if self.task is None:
+            self.get_logger().error("Can't pick a box without any task")
             raise RuntimeError("Can't pick a box without any task")
 
+        self.get_logger().info(f"Picking box '{self.task.box_id}'")
         return self.box_transfer.call_async(
             wa_srvs.BoxTransfer.Request(
                 box_id=self.task.box_id,
@@ -481,8 +519,10 @@ class Mobilebot(Node):
     def drop_box(self, to_entity: str) -> rclpy.Future:
         """Drop a box on an entity."""
         if self.task is None:
+            self.get_logger().error("Can't drop a box without any task")
             raise RuntimeError("Can't drop a box without any task")
 
+        self.get_logger().info(f"Dropping box '{self.task.box_id}'")
         return self.box_transfer.call_async(
             wa_srvs.BoxTransfer.Request(
                 box_id=self.task.box_id,
