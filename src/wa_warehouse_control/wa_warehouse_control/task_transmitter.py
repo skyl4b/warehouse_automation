@@ -59,8 +59,14 @@ class TaskTransmitter(Node):
     broadcast_timer: Timer
     """Timer for demand generation."""
 
+    publish_map_timer: Timer
+    """Timer for map publishing."""
+
     broadcast: Publisher
     """Publisher for broadcasting tasks."""
+
+    map_publisher: Publisher
+    """Publisher for the current map."""
 
     box_order: Client
     """Client for ordering boxes."""
@@ -74,7 +80,12 @@ class TaskTransmitter(Node):
     consume_output_demand: Client
     """Client for consuming output demands."""
 
-    def __init__(self, broadcast_period: float, map_: Map) -> None:
+    def __init__(
+        self,
+        broadcast_period: float,
+        map_: Map,
+        publish_map_period: float = 2.0,
+    ) -> None:
         super().__init__(  # type: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
@@ -91,6 +102,7 @@ class TaskTransmitter(Node):
         # Parameters
         self.declare_parameter("broadcast_period", broadcast_period)
         self.declare_parameter("map", yaml.safe_dump(map_))
+        self.declare_parameter("publish_map_period", publish_map_period)
         self.create_subscription(  # Monitor set parameter
             rcl_msgs.ParameterEvent,
             "/parameter_events",
@@ -123,11 +135,20 @@ class TaskTransmitter(Node):
             broadcast_period,
             self.broadcast_callback,
         )
+        self.publish_map_timer = self.create_timer(
+            self.publish_map_period,
+            self.publish_map_callback,
+        )
 
         # Publishers
         self.broadcast = self.create_publisher(
             std_msgs.UInt8,
             f"{self.get_name()}/broadcast",
+            10,
+        )
+        self.map_publisher = self.create_publisher(
+            std_msgs.String,
+            f"{self.get_name()}/map",
             10,
         )
 
@@ -177,6 +198,11 @@ class TaskTransmitter(Node):
             self.get_parameter("map").value,  # type: ignore[reportIncompatibleType]
         )
 
+    @property
+    def publish_map_period(self) -> float:
+        """Publish period of the map."""
+        return self.get_parameter("publish_map_period").value  # type: ignore[reportIncompatibleType]
+
     def parameter_event_callback(
         self,
         message: rcl_msgs.ParameterEvent,
@@ -187,13 +213,24 @@ class TaskTransmitter(Node):
                 if parameter.name == "broadcast_period":
                     # Regenerate broadcast timer
                     self.get_logger().info(
-                        "Updating timer to "
+                        "Updating broadcast timer to "
                         f"broadcast_period {self.broadcast_period}",
                     )
                     self.broadcast_timer.destroy()
                     self.broadcast_timer = self.create_timer(
                         self.broadcast_period,
                         self.broadcast_callback,
+                    )
+                elif parameter.name == "publish_map_period":
+                    # Regenerate publish map timer
+                    self.get_logger().info(
+                        "Updating publish map timer to "
+                        f"publish_map_period {self.publish_map_period}",
+                    )
+                    self.publish_map_timer.destroy()
+                    self.publish_map_timer = self.create_timer(
+                        self.publish_map_period,
+                        self.publish_map_callback,
                     )
 
     def update_map(self, map_: Map) -> None:
@@ -236,6 +273,39 @@ class TaskTransmitter(Node):
 
         self.get_logger().info(f"Broadcasting task {self.task.uid}")
         self.broadcast.publish(std_msgs.UInt8(data=self.task.uid))
+
+    def publish_map_callback(self) -> None:
+        """Publish the current map."""
+        map_ = self.map
+        map_builder = [
+            "".join(
+                "E"
+                if conveyor_belt["box_id"] == "empty"
+                else "I"
+                if conveyor_belt["box_id"] == "in-use"
+                else "F"
+                for conveyor_belt in map_["conveyor_belts"]["output"]
+            ),
+            "".join(
+                "E"
+                if storage_unit["box_id"] == "empty"
+                else "I"
+                if storage_unit["box_id"] == "in-use"
+                else "F"
+                for storage_unit in map_["storage_units"]
+            ),
+            "".join(
+                "E"
+                if conveyor_belt["box_id"] == "empty"
+                else "I"
+                if conveyor_belt["box_id"] == "in-use"
+                else "F"
+                for conveyor_belt in map_["conveyor_belts"]["input"]
+            ),
+        ]
+        self.map_publisher.publish(
+            std_msgs.String(data="||".join(map_builder)),
+        )
 
     def task_midpoint_callback(self, message: std_msgs.UInt8) -> None:
         """Update the box ids and full status for the task."""
