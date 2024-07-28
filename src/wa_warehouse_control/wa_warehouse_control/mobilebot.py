@@ -24,7 +24,6 @@ from nav2_msgs.srv import (
 )
 from nav2_simple_commander.robot_navigator import BasicNavigator
 from nav_msgs import msg as nav_msgs
-from rcl_interfaces.msg import SetParametersResult
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import (
@@ -38,8 +37,9 @@ from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
 
 if TYPE_CHECKING:
+    from rcl_interfaces import msg as rcl_msgs
     from rclpy.client import Client
-    from rclpy.parameter import Parameter
+    from rclpy.timer import Timer
 
 NAVIGATION_FRAME_ID: Final[str] = "map"
 """Relative frame for the automatic navigation."""
@@ -190,6 +190,9 @@ class Mobilebot(Node):
     goal_status: Literal["idle", "to_start", "to_end", "pick_box", "drop_box"]
     """Current goal status."""
 
+    goal_check_timer: Timer
+    """Timer for checking if the robot reached the goal."""
+
     def __init__(
         self,
         goal_check_period: float = 0.2,
@@ -235,7 +238,7 @@ class Mobilebot(Node):
         self.navigator.waitUntilNav2Active()
 
         # Timers
-        self.create_timer(
+        self.goal_check_timer = self.create_timer(
             self.goal_check_period,
             self.goal_check_callback,
         )
@@ -281,27 +284,31 @@ class Mobilebot(Node):
         """Initial position of the robot."""
         return self.get_parameter("initial_position").value  # type: ignore[reportIncompatibleType]
 
-    def parameters_set_callback(
+    def parameter_event_callback(
         self,
-        parameters: list[Parameter],
-    ) -> SetParametersResult:
-        for parameter in parameters:
-            if parameter.name == "initial_position":
-                value = list(cast(list[float], parameter.value))
-                if len(value) != 2:  # noqa: PLR2004
-                    self.get_logger().warn(
-                        f"Unable to set initial_position to: {value}",
+        message: rcl_msgs.ParameterEvent,
+    ) -> None:
+        """Monitor changes to this node's parameters for timer / position."""
+        if message.node == self.get_fully_qualified_name():
+            for parameter in message.changed_parameters:
+                if parameter.name == "goal_check_period":
+                    # Regenerate goal_check timer
+                    self.get_logger().info(
+                        "Updating timer to "
+                        f"goal_check_period {self.goal_check_period}",
                     )
-                    return SetParametersResult(
-                        successful=False,
-                        reason="initial_position must have two elements.",
+                    self.goal_check_timer.destroy()
+                    self.goal_check_timer = self.create_timer(
+                        self.goal_check_period,
+                        self.goal_check_callback,
                     )
-                self.get_logger().info(
-                    f"initial_position set to: {value}",
-                )
-                self.set_initial_position((value[0], value[1]))
-
-        return SetParametersResult(successful=True)
+                elif parameter.name == "initial_position":
+                    # Update initial position
+                    self.get_logger().info(
+                        f"Updating initial position to "
+                        f"{self.initial_position[:2]}",
+                    )
+                    self.set_initial_position(self.initial_position[:2])
 
     def set_initial_position(
         self,
