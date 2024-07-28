@@ -10,6 +10,7 @@ from rcl_interfaces import msg as rcl_msgs
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from std_msgs import msg as std_msgs
+from std_srvs import srv as std_srvs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
 
@@ -122,11 +123,23 @@ class TaskTransmitter(Node):
             wa_srvs.BoxSend,
             "box/send",
         )
+        self.consume_input_demand = self.create_client(
+            std_srvs.Empty,
+            "demand_generator/consume/input",
+        )
+        self.consume_output_demand = self.create_client(
+            std_srvs.Empty,
+            "demand_generator/consume/output",
+        )
         while not (
             self.box_order.wait_for_service(5.0)
             and self.box_send.wait_for_service(5.0)
+            and self.consume_input_demand.wait_for_service(5.0)
+            and self.consume_output_demand.wait_for_service(5.0)
         ):
-            self.get_logger().info("Waiting for box order services")
+            self.get_logger().info(
+                "Waiting for box order & consume demand services",
+            )
 
         # Services
         self.confirm = self.create_service(
@@ -182,6 +195,26 @@ class TaskTransmitter(Node):
         if self.task is None:
             if (task := self.generate_task()) is None:
                 return
+
+            # Consume demand
+            if task.type_ == "input":
+                self.consume_input_demand.call_async(
+                    std_srvs.Empty.Request(),
+                ).add_done_callback(
+                    lambda _: self.get_logger().info(
+                        "Consumed 1 input demand",
+                    ),
+                )
+            elif task.type_ == "output":
+                self.consume_output_demand.call_async(
+                    std_srvs.Empty.Request(),
+                ).add_done_callback(
+                    lambda _: self.get_logger().info(
+                        "Consumed 1 output demand",
+                    ),
+                )
+
+            # Set task
             self.task = task
 
         self.get_logger().info(f"Broadcasting task {self.task.uid}")
