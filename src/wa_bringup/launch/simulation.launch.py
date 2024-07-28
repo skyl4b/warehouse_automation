@@ -116,12 +116,15 @@ def spawn_robots(
                     str(y[i]),
                 ],
                 output="screen",
+                parameters=[{"use_sim_time": True}],
             ),
             Node(
                 package="robot_state_publisher",
                 executable="robot_state_publisher",
                 name="robot_state_publisher",
                 namespace=f"{NAMESPACE}/mobilebot_{i + 1}",
+                remappings=[("/tf", "tf"), ("/tf_static", "tf_static")],
+                output="screen",
                 parameters=[
                     {
                         "use_sim_time": True,
@@ -134,8 +137,7 @@ def spawn_robots(
                         ).read_text(encoding="utf-8"),
                     },
                 ],
-                remappings=[("/tf", "tf"), ("/tf_static", "tf_static")],
-                output="screen",
+                condition=IfCondition(str(automatic_navigation_i)),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -146,6 +148,7 @@ def spawn_robots(
                     ]),
                 ),
                 launch_arguments={
+                    "use_sim_time": "True",
                     # Nav2 does not accept namespaces starting with '/'
                     "namespace": f"{NAMESPACE.lstrip('/')}/mobilebot_{i + 1}",
                     "use_namespace": "True",
@@ -155,7 +158,6 @@ def spawn_robots(
                         "maps",
                         "map.yaml",
                     ]),
-                    "use_sim_time": "True",
                     "params_file": PathJoinSubstitution([
                         FindPackageShare("wa_environment"),
                         "params",
@@ -173,7 +175,9 @@ def spawn_robots(
                 name=f"mobilebot_{i + 1}",
                 output="screen",
                 namespace=NAMESPACE,
-                parameters=[{"initial_position": [0.0, y[i]]}],
+                parameters=[
+                    {"use_sim_time": True, "initial_position": [0.0, y[i]]},
+                ],
                 condition=IfCondition(
                     LaunchConfiguration("warehouse_automation"),
                 ),
@@ -235,6 +239,7 @@ def populate_storage(context: LaunchContext) -> list[Node]:
             name="box_spawner",
             namespace=NAMESPACE,
             parameters=[
+                {"use_sim_time": True},
                 {
                     "box_spawns": yaml.safe_dump([
                         {
@@ -261,7 +266,7 @@ def populate_storage(context: LaunchContext) -> list[Node]:
             name="task_transmitter",
             output="screen",
             namespace=NAMESPACE,
-            parameters=[{"map": yaml.safe_dump(map_)}],
+            parameters=[{"use_sim_time": True, "map": yaml.safe_dump(map_)}],
             condition=IfCondition(
                 LaunchConfiguration("warehouse_automation"),
             ),
@@ -375,6 +380,7 @@ def generate_launch_description() -> LaunchDescription:
                 name="gazebo_bridge",
                 output="screen",
                 namespace=NAMESPACE,
+                parameters=[{"use_sim_time": True}],
             ),
             # Spawn robots
             OpaqueFunction(function=spawn_robots),
@@ -388,6 +394,7 @@ def generate_launch_description() -> LaunchDescription:
                     ]),
                 ),
                 launch_arguments={
+                    "use_sim_time": "true",
                     "namespace": f"{NAMESPACE}/mobilebot_1/",
                     "use_namespace": "True",
                     "rviz_config_file": PathJoinSubstitution([
@@ -410,6 +417,7 @@ def generate_launch_description() -> LaunchDescription:
                 condition=IfCondition(
                     LaunchConfiguration("warehouse_automation"),
                 ),
+                parameters=[{"use_sim_time": True}],
             ),
         ],
     )

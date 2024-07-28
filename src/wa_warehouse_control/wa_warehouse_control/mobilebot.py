@@ -109,7 +109,10 @@ class Mobilebot(Node):
         self.goal_status = "idle"
 
         # Robot navigator
-        self.navigator = Navigator(namespace=self.get_fully_qualified_name())
+        self.navigator = Navigator(
+            namespace=self.get_fully_qualified_name(),
+            use_sim_time=self.get_parameter("use_sim_time").value,  # type: ignore[reportArgumentType]
+        )
         self.set_initial_position(self.initial_position)
         self.navigator.waitUntilNav2Active()
 

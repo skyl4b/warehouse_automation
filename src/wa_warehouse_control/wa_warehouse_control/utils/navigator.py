@@ -22,6 +22,7 @@ from nav2_msgs.srv import (
 )
 from nav2_simple_commander.robot_navigator import BasicNavigator
 from rclpy.action import ActionClient
+from rclpy.parameter import Parameter
 from rclpy.qos import (
     QoSDurabilityPolicy,
     QoSHistoryPolicy,
@@ -46,12 +47,16 @@ class Navigator(BasicNavigator):
         self,
         name: str | None = None,
         namespace: str | None = None,
+        use_sim_time: bool = True,
     ) -> None:
         """Override the initialization of the BasicNavigator node."""
-        super(BasicNavigator, self).__init__(  # type: ignore[reportArgumentType]
+        super(BasicNavigator, self).__init__(
             node_name=name if name is not None else self.name,
             namespace=namespace if namespace is not None else self.namespace,
             use_global_arguments=False,
+            parameter_overrides=[
+                Parameter("use_sim_time", Parameter.Type.BOOL, use_sim_time),
+            ],
         )
 
         self.initial_pose = geometry_msgs.PoseStamped()
