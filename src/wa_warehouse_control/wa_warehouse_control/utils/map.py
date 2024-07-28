@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Final, TypedDict
+from typing import Final, Literal, TypeAlias, TypedDict
 
 
 class Position(TypedDict):
@@ -20,10 +20,14 @@ class Model(TypedDict):
     position: Position
 
 
+BoxId: TypeAlias = int | Literal["empty", "in-use"]
+"""A models box id if it is carrying a box."""
+
+
 class ConveyorBelt(Model):
     """A conveyor belt in the warehouse automation project."""
 
-    empty: bool
+    box_id: BoxId
 
 
 class ConveyorBelts(TypedDict):
@@ -36,7 +40,7 @@ class ConveyorBelts(TypedDict):
 class StorageUnit(Model):
     """A storage unit in the warehouse automation project."""
 
-    box_id: int | None
+    box_id: BoxId
 
 
 class Map(TypedDict):
@@ -52,34 +56,34 @@ BASE_MAP: Final[Map] = {
             {
                 "name": "conveyor_belt_0_0",
                 "position": {"x": 3.0, "y": -8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
             {
                 "name": "conveyor_belt_0_1",
                 "position": {"x": 0.0, "y": -8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
             {
                 "name": "conveyor_belt_0_2",
                 "position": {"x": -3.0, "y": -8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
         ],
         "output": [
             {
                 "name": "conveyor_belt_1_0",
                 "position": {"x": 3.0, "y": 8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
             {
                 "name": "conveyor_belt_1_1",
                 "position": {"x": 0.0, "y": 8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
             {
                 "name": "conveyor_belt_1_2",
                 "position": {"x": -3.0, "y": 8.7, "z": 0.4},
-                "empty": True,
+                "box_id": "empty",
             },
         ],
     },
@@ -87,52 +91,52 @@ BASE_MAP: Final[Map] = {
         {
             "name": "storage_unit_0_0",
             "position": {"x": 1.5, "y": -6.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_1_0",
             "position": {"x": 1.5, "y": -3.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_2_0",
             "position": {"x": 1.5, "y": 0.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_3_0",
             "position": {"x": 1.5, "y": 3.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_4_0",
             "position": {"x": 1.5, "y": 6.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_0_1",
             "position": {"x": -1.5, "y": -6.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_1_1",
             "position": {"x": -1.5, "y": -3.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_2_1",
             "position": {"x": -1.5, "y": 0.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_3_1",
             "position": {"x": -1.5, "y": 3.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
         {
             "name": "storage_unit_4_1",
             "position": {"x": -1.5, "y": 6.0, "z": 0.28},
-            "box_id": None,
+            "box_id": "empty",
         },
     ],
 }

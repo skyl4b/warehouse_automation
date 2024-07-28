@@ -16,7 +16,12 @@ from wa_warehouse_control.task_stats import Task
 from wa_warehouse_control.utils.map import BASE_MAP
 
 if TYPE_CHECKING:
-    from wa_warehouse_control.utils.map import ConveyorBelt, Map, StorageUnit
+    from wa_warehouse_control.utils.map import (
+        BoxId,
+        ConveyorBelt,
+        Map,
+        StorageUnit,
+    )
 
 
 class TaskTransmitter(Node):
@@ -42,9 +47,6 @@ class TaskTransmitter(Node):
     task: Task | None
     """Task being broadcasted."""
 
-    task_box_id: int | None
-    """The box_id of the task being broadcasted."""
-
     active_tasks: list[Task]
     """Active tasks being executed by robots."""
 
@@ -60,7 +62,6 @@ class TaskTransmitter(Node):
 
         # Task management
         self.task = None
-        self.task_box_id = None
         self.active_tasks = []
 
         # Parameters
@@ -155,15 +156,47 @@ class TaskTransmitter(Node):
 
     def task_midpoint_callback(self, message: std_msgs.UInt8) -> None:
         """Update the box ids and full status for the task."""
+        for task in self.active_tasks:
+            if task.uid == int(message.data):
+                self.set_model_box_id(task.start["name"], "empty")
+                return
+
+        self.get_logger().warn(
+            f"Task {message.data} not found, "
+            "can't set midpoint. "
+            f"Active tasks {[task.uid for task in self.active_tasks]}",
+        )
 
     def task_completed_callback(self, message: std_msgs.UInt8) -> None:
         """Update the box ids and full status for the task, set as complete."""
         # Remove from active tasks
-        for i in range(len(self.active_tasks)):
-            if self.active_tasks[i].uid == message.data:
-                self.active_tasks.pop(i)
+        for i, task in enumerate(self.active_tasks):
+            if task.uid == message.data:
                 self.get_logger().info(f"Task {message.data} completed")
+                if task.box_id is None:
+                    self.get_logger().error(
+                        f"Task {task.uid} box id not set, "
+                        "can't update map or send box.",
+                    )
+                    self.active_tasks.pop(i)  # noqa: B909
+                    return
+                self.set_model_box_id(task.end["name"], task.box_id)
+                if task.type_ == "output":
+                    # Send box out
+                    self.box_send.call_async(
+                        wa_srvs.BoxSend.Request(
+                            box_id=task.box_id,
+                            detach_from=task.end["name"],
+                        ),
+                    ).add_done_callback(
+                        lambda _, task=task: self.set_model_box_id(
+                            task.end["name"],
+                            "empty",
+                        ),
+                    )
+                self.active_tasks.pop(i)  # noqa: B909
                 return
+
         self.get_logger().warn(
             f"Task {message.data} not found, can't complete",
         )
@@ -211,21 +244,32 @@ class TaskTransmitter(Node):
                     attach_to=start["name"],
                 ),
             ).add_done_callback(self.set_box_id_callback)
-            start["empty"] = False
-            end["box_id"] = -1  # Set to -1 for now, override with callback
+            box_id = None
         else:
             start = storage_unit
             end = conveyor_belt
             # Output tasks should known the box ids on their start and occupy
             # their target units even before arriving (prevent deadlock)
-            self.task_box_id = start["box_id"]
-            end["empty"] = False
-        self.update_map(map_)
+            if start["box_id"] in {"in-use", "empty"}:
+                self.get_logger().error(
+                    f"Box id of '{start}' should not be undefined",
+                )
+                return None
+            box_id = start["box_id"]
+
+        # Set to in-use for now, override with callback
+        self.set_model_box_id(start["name"], "in-use")
+        self.set_model_box_id(end["name"], "in-use")
 
         # Generate task
-        task = Task.create_task(start, end)
+        task = Task.create_task(
+            task_type,
+            start,
+            end,
+            box_id,  # type: ignore[reportArgumentType]
+        )
         self.get_logger().info(
-            f"Generating {task_type} task {task.uid} from "
+            f"Generating {task.type_} task {task.uid} from "
             f"'{start['name']}' at "
             "("
             f"x: {start['position']['x']:.2f}, y: {start['position']['y']:.2f}"
@@ -281,7 +325,7 @@ class TaskTransmitter(Node):
             range(len(map_["conveyor_belts"][belt_type])),
             k=len(map_["conveyor_belts"][belt_type]),
         ):
-            if map_["conveyor_belts"][belt_type][i]["empty"]:
+            if map_["conveyor_belts"][belt_type][i]["box_id"] == "empty":
                 return map_["conveyor_belts"][belt_type][i]
 
         self.get_logger().warn(f"Empty {belt_type} conveyor belt not found")
@@ -310,9 +354,9 @@ class TaskTransmitter(Node):
             )
             for i in range(len(map_["storage_units"]))
         ):
-            # Ignore fallback box_ids
-            if map_["storage_units"][i]["box_id"] != -1 and (
-                empty == (map_["storage_units"][i]["box_id"] is None)
+            if (empty and map_["storage_units"][i]["box_id"] == "empty") or (
+                not empty
+                and isinstance(map_["storage_units"][i]["box_id"], int)
             ):
                 return map_["storage_units"][i]
 
@@ -329,8 +373,7 @@ class TaskTransmitter(Node):
         """Confirm or not a task to a robot that requested it."""
         if (
             self.task is None
-            or self.task_box_id is None
-            or self.task_box_id == -1
+            or not isinstance(self.task.box_id, int)
             or self.task.uid != request.task_uid
         ):
             self.get_logger().info(
@@ -364,11 +407,10 @@ class TaskTransmitter(Node):
                     ),
                 ),
             ),
-            box_id=self.task_box_id,
+            box_id=self.task.box_id,
         )
         self.active_tasks.append(self.task)
         self.task = None
-        self.task_box_id = None
 
         return response
 
@@ -379,19 +421,35 @@ class TaskTransmitter(Node):
             return
 
         result = cast(wa_srvs.BoxOrder.Response, future.result())
-        self.task_box_id = result.box_id
+        self.task.box_id = result.box_id
 
         # This callback should only be called on input tasks
-        # Set the unit to the box_id received
+        # Set the storage unit to the box_id received
+        self.set_model_box_id(
+            self.task.start["name"],
+            result.box_id,
+        )
+
+    def set_model_box_id(self, model_name: str, box_id: BoxId) -> None:
+        """Set model box_id in the map."""
         map_ = self.map
-        for storage_unit in map_["storage_units"]:
-            if storage_unit["name"] == self.task.end["name"]:
-                storage_unit["box_id"] = result.box_id
+
+        # Search storage units and conveyor belts
+        for model in (
+            map_["storage_units"]
+            + map_["conveyor_belts"]["input"]
+            + map_["conveyor_belts"]["output"]
+        ):
+            if model["name"] == model_name:
+                self.get_logger().info(
+                    f"Setting '{model['name']}' box_id to '{box_id}'",
+                )
+                model["box_id"] = box_id
                 self.update_map(map_)
                 return
+
         self.get_logger().error(
-            "Couldn't find storage_unit "
-            f"'{self.task.end['name']}' to set box_id",
+            f"Couldn't find model '{model_name}' to set box_id {box_id}",
         )
 
 
