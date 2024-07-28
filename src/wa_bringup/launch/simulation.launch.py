@@ -12,7 +12,7 @@ from typing import Final
 import yaml
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from wa_warehouse_control.utils.map import BASE_MAP
+from wa_warehouse_control.utils.map import BASE_MAP, Map
 
 from launch import LaunchContext, LaunchDescription
 from launch.actions import (
@@ -74,13 +74,13 @@ def generate_radial_points(
 
 def parse_automatic_navigation(arg: str, n_robots: int) -> list[bool]:
     """Parse the populate storage argument."""
-    enabled = [True] * n_robots
     if arg == "all":
-        return enabled
+        return [True] * n_robots
+    if arg == "none":
+        return [False] * n_robots
     if arg.startswith("not"):
         not_id = int(arg.split(" ")[1])
-        enabled[not_id] = False
-        return enabled
+        return [i != not_id for i in range(n_robots)]
 
     return [bool(int(c)) for c in arg.ljust(n_robots)]
 
@@ -200,16 +200,33 @@ def parse_populate(arg: str) -> set[str]:
         "storage_unit_3_1",
         "storage_unit_4_1",
     ]
+
     if arg == "all":
         return set(all_units)
+    if arg == "none":
+        return set()
+
     return {unit for c, unit in zip(arg, all_units) if bool(int(c))}
 
 
+def update_map(map_: Map, populate: set[str]) -> Map:
+    """Update the map with the populated storage."""
+    box_counter = 0
+    for storage_unit in map_["storage_units"]:
+        if storage_unit["name"] in populate:
+            box_counter += 1
+            storage_unit["box_id"] = box_counter
+        else:
+            storage_unit["box_id"] = "empty"
+    return map_
+
+
 def populate_storage(context: LaunchContext) -> list[Node]:
-    """Populate the storage with inital boxes."""
+    """Populate the storage with inital boxes, startup task_transmitter."""
     populate = parse_populate(
         str(LaunchConfiguration("populate").perform(context)),
     )
+    map_ = update_map(BASE_MAP, populate)
 
     return [
         Node(
@@ -229,14 +246,25 @@ def populate_storage(context: LaunchContext) -> list[Node]:
                             "attach_to": storage_unit["name"],
                         }
                         for storage_unit in filter(
-                            lambda storage_unit: storage_unit["name"]
-                            in populate,
-                            BASE_MAP["storage_units"],
+                            lambda storage_unit: storage_unit["box_id"]
+                            != "empty",
+                            map_["storage_units"],
                         )
                     ]),
                 },
             ],
             condition=IfCondition(str(len(populate) != 0)),
+        ),
+        Node(
+            package="wa_warehouse_control",
+            executable="task_transmitter",
+            name="task_transmitter",
+            output="screen",
+            namespace=NAMESPACE,
+            parameters=[{"map": yaml.safe_dump(map_)}],
+            condition=IfCondition(
+                LaunchConfiguration("warehouse_automation"),
+            ),
         ),
     ]
 
@@ -294,15 +322,15 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "populate",
-                default_value="0000000000",
+                default_value="0101010101",
                 description="The boxes in storage to populate on startup, "
-                "either a binary string or 'all'",
+                "either a binary string, 'all' or 'none'",
             ),
             DeclareLaunchArgument(
                 "automatic_navigation",
                 default_value="all",
                 description="For which robots should be moved automatically, "
-                "either a binary string, 'all' or 'not {index}'",
+                "either a binary string, 'all', 'none' or 'not {index}'",
             ),
             DeclareLaunchArgument(
                 "rviz",
@@ -373,16 +401,6 @@ def generate_launch_description() -> LaunchDescription:
             # Populate storage with inital boxes
             OpaqueFunction(function=populate_storage),
             # Start warehouse automation
-            Node(
-                package="wa_warehouse_control",
-                executable="task_transmitter",
-                name="task_transmitter",
-                output="screen",
-                namespace=NAMESPACE,
-                condition=IfCondition(
-                    LaunchConfiguration("warehouse_automation"),
-                ),
-            ),
             Node(
                 package="wa_warehouse_control",
                 executable="demand_generator",
