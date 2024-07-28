@@ -4,6 +4,7 @@ import random
 from typing import TYPE_CHECKING, ClassVar, Final, Literal
 
 import rclpy
+from rcl_interfaces import msg as rcl_msgs
 from rclpy.node import Node
 from std_srvs import srv as std_srvs
 from wa_interfaces import msg as wa_msgs
@@ -57,6 +58,12 @@ class DemandGenerator(Node):
         self.declare_parameter("min_demand_period", min_demand_period)
         self.declare_parameter("max_demand_period", max_demand_period)
         self.declare_parameter("input_probability", input_probability)
+        self.create_subscription(  # Monitor set parameter
+            rcl_msgs.ParameterEvent,
+            "/parameter_events",
+            self.parameter_event_callback,
+            10,
+        )
 
         # Timers
         self.demand_timer = self.create_timer(
@@ -101,19 +108,34 @@ class DemandGenerator(Node):
         """Probability for an input demand (1 - probability output)."""
         return self.get_parameter("input_probability").value  # type: ignore[reportReturnType]
 
-    def demand_callback(self) -> None:
+    def parameter_event_callback(
+        self,
+        message: rcl_msgs.ParameterEvent,
+    ) -> None:
+        """Monitor changes to this node's parameters to update the timer."""
+        if message.node == self.get_fully_qualified_name():
+            for parameter in message.changed_parameters:
+                if parameter.name in {
+                    "min_demand_period",
+                    "max_demand_period",
+                }:
+                    # Regenerate demand timer
+                    self.demand_callback(increase_demand=False)
+
+    def demand_callback(self, increase_demand: bool = True) -> None:
         """Generate a demand."""
-        # Input or output
-        if random.random() < self.input_probability:
-            self.input_demand = min(
-                self.input_demand + 1,
-                MAX_DEMAND,
-            )
-        else:
-            self.output_demand = min(
-                self.output_demand + 1,
-                MAX_DEMAND,
-            )
+        if increase_demand:
+            # Input or output
+            if random.random() < self.input_probability:
+                self.input_demand = min(
+                    self.input_demand + 1,
+                    MAX_DEMAND,
+                )
+            else:
+                self.output_demand = min(
+                    self.output_demand + 1,
+                    MAX_DEMAND,
+                )
 
         # Setup next demand time
         self.demand_timer.destroy()
@@ -177,8 +199,8 @@ def main() -> None:
     """Run the demand generator."""
     rclpy.init()
     node = DemandGenerator(
-        5.0,
-        10.0,
+        20.0,
+        60.0,
     )
 
     try:
