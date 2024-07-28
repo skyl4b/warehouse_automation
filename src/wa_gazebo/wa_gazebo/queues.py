@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     import rclpy
     from rclpy.node import Node
 
-QUEUE_HANDLER_PERIOD_S: Final[float] = 0.2
+QUEUE_HANDLER_PERIOD_S: Final[float] = 0.4
 """Period to call the queue handler in seconds."""
 
-MAX_RETRIES: Final[int] = 5
+MAX_RETRIES: Final[int] = 8
 """Maximum number of retries for a Gazebo interaction."""
 
 
