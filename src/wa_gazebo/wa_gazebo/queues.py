@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from queue import Empty, Queue
-from typing import TYPE_CHECKING, Callable, Final
+from queue import Queue
+from typing import TYPE_CHECKING, Callable, Final, Literal, cast
 
 if TYPE_CHECKING:
     import rclpy
@@ -14,63 +14,8 @@ if TYPE_CHECKING:
 QUEUE_HANDLER_PERIOD_S: Final[float] = 0.2
 """Period to call the queue handler in seconds."""
 
-MAX_QUEUE_SIZE: Final[int] = 20
-"""Max number of tasks in the queue of Gazebo interactions."""
-
-
-@dataclass
-class GazeboQueues:
-    """Queues for the queue handler to operate."""
-
-    spawner: Queue[wa_srvs.Spawn.Request] = field(
-        default_factory=lambda: Queue(MAX_QUEUE_SIZE),
-    )
-    """Queue for the periodic spawn."""
-
-    spawn_counter: int = 0
-    """Counter for when spawning is done."""
-
-    destroyer: Queue[wa_srvs.Destroy.Request] = field(
-        default_factory=lambda: Queue(MAX_QUEUE_SIZE),
-    )
-    """Queue for the periodic destroy."""
-
-    attacher: Queue[wa_srvs.ToggleAttach.Request] = field(
-        default_factory=lambda: Queue(MAX_QUEUE_SIZE),
-    )
-    """Queue for the periodic attach."""
-
-    detacher: Queue[wa_srvs.ToggleAttach.Request] = field(
-        default_factory=lambda: Queue(MAX_QUEUE_SIZE),
-    )
-    """Queue for the periodic detach."""
-
-    detach_counter: int = 0
-    """Counter for when attaching is done."""
-
-    def empty(self) -> bool:
-        """Check if all GazeboBridge queues are empty."""
-        return all(
-            queue.empty()
-            for key, queue in self.__dict__.items()
-            if not key.endswith("counter")
-        )
-
-    def increase_spawn_counter(self) -> None:
-        """Increase the spawn counter."""
-        self.spawn_counter += 1
-
-    def decrease_spawn_counter(self) -> None:
-        """Decrease the spawn counter."""
-        self.spawn_counter = max(self.spawn_counter - 1, 0)
-
-    def increase_detach_counter(self) -> None:
-        """Increase the detach counter."""
-        self.detach_counter += 1
-
-    def decrease_detach_counter(self) -> None:
-        """Decrease the detach counter."""
-        self.detach_counter = max(self.detach_counter - 1, 0)
+MAX_RETRIES: Final[int] = 5
+"""Maximum number of retries for a Gazebo interaction."""
 
 
 @dataclass
@@ -116,8 +61,16 @@ class GazeboQueueHandler:
     handles: GazeboActionHandles = field(init=False)
     """Handles for each type of a Gazebo action."""
 
-    queue: GazeboQueues = field(init=False)
-    """Quees for each handle of a Gazebo action."""
+    queue: list[
+        tuple[Literal["spawn"], wa_srvs.Spawn.Request]
+        | tuple[Literal["destroy"], wa_srvs.Destroy.Request]
+        | tuple[Literal["attach"], wa_srvs.ToggleAttach.Request]
+        | tuple[Literal["detach"], wa_srvs.ToggleAttach.Request]
+    ] = field(init=False, default_factory=list)
+    """Queue to handle Gazebo actions."""
+
+    retries: int = field(init=False, default=0)
+    """Current retries for a Gazebo interaction."""
 
     start_simulation: Callable[..., rclpy.Future | None]
     """Action to start the Gazebo simulation."""
@@ -139,76 +92,57 @@ class GazeboQueueHandler:
             QUEUE_HANDLER_PERIOD_S,
             self.queue_callback,
         )
-        self.queue = GazeboQueues()
 
-    def queue_callback(self) -> None:  # noqa: PLR0912
+    def queue_callback(self) -> None:
         """Process the queue of Gazebo interactions."""
-        if self.queue.empty():
+        if len(self.queue) == 0:
             # Nothing to process
             return
 
-        # Pause simulation before handling the queue
+        # Pause simulation before handling the next action in the queue
         self.stop_simulation()
         future = None
 
+        action, task = self.queue[0]
+
         # Spawn models
-        if not self.queue.spawner.empty():
-            try:
-                task = self.queue.spawner.get_nowait()
-                future = self.handles.spawn(task)
-                if future is not None:
-                    future.add_done_callback(
-                        lambda _: self.queue.decrease_spawn_counter(),
-                    )
-            except Empty:
-                pass
+        if action == "spawn":
+            task = cast(wa_srvs.Spawn.Request, task)
+            future = self.handles.spawn(task)
         # Attach models
-        elif (
-            not self.queue.attacher.empty()
-            and self.queue.spawn_counter == 0
-            and self.queue.detach_counter == 0
-        ):
-            try:
-                while True:
-                    task = self.queue.attacher.get_nowait()
-                    future = self.handles.attach(task)
-            except Empty:
-                pass
+        elif action == "attach":
+            task = cast(wa_srvs.ToggleAttach.Request, task)
+            future = self.handles.attach(task)
         # Detach models
-        elif not self.queue.detacher.empty():
-            try:
-                while True:
-                    task = self.queue.detacher.get_nowait()
-                    future = self.handles.detach(task)
-                    if future is not None:
-                        future.add_done_callback(
-                            lambda _: self.queue.decrease_detach_counter(),
-                        )
-            except Empty:
-                pass
+        elif action == "detach":
+            task = cast(wa_srvs.ToggleAttach.Request, task)
+            future = self.handles.detach(task)
         # Destroy models
-        elif (
-            not self.queue.destroyer.empty() and self.queue.detach_counter == 0
-        ):
-            try:
-                while True:
-                    task = self.queue.destroyer.get_nowait()
-                    future = self.handles.destroy(task)
-            except Empty:
-                pass
+        elif action == "destroy":
+            task = cast(wa_srvs.Destroy.Request, task)
+            future = self.handles.destroy(task)
         # Continue simulation
         if future is not None:
-            future.add_done_callback(lambda _: self.start_simulation())
+            future.add_done_callback(self.retry_if_needed_callback)
         else:
             self.start_simulation()
+
+    def retry_if_needed_callback(self, future: rclpy.Future) -> None:
+        """Retry Gazebo interaction if necessary."""
+        if future.result().success or self.retries >= MAX_RETRIES:  # type: ignore[reportOptionalMemberAccess]
+            self.retries = 0
+            self.queue.pop(0)
+            self.start_simulation()
+            return
+        # Try again
+        self.retries += 1
 
     def enqueue_spawn_callback(
         self,
         request: wa_srvs.Spawn.Request,
         response: wa_srvs.Spawn.Response,
     ) -> wa_srvs.Spawn.Response:
-        self.queue.spawner.put(request)
-        self.queue.increase_spawn_counter()
+        self.queue.append(("spawn", request))
         return response
 
     def enqueue_destroy_callback(
@@ -216,7 +150,7 @@ class GazeboQueueHandler:
         request: wa_srvs.Destroy.Request,
         response: wa_srvs.Destroy.Response,
     ) -> wa_srvs.Destroy.Response:
-        self.queue.destroyer.put(request)
+        self.queue.append(("destroy", request))
         return response
 
     def enqueue_attach_callback(
@@ -224,7 +158,7 @@ class GazeboQueueHandler:
         request: wa_srvs.ToggleAttach.Request,
         response: wa_srvs.ToggleAttach.Response,
     ) -> wa_srvs.ToggleAttach.Response:
-        self.queue.attacher.put(request)
+        self.queue.append(("attach", request))
         return response
 
     def enqueue_detach_callback(
@@ -232,6 +166,5 @@ class GazeboQueueHandler:
         request: wa_srvs.ToggleAttach.Request,
         response: wa_srvs.ToggleAttach.Response,
     ) -> wa_srvs.ToggleAttach.Response:
-        self.queue.detacher.put(request)
-        self.queue.increase_detach_counter()
+        self.queue.append(("detach", request))
         return response

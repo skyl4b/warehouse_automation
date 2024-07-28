@@ -251,7 +251,17 @@ class GazeboBridge(Node):
 
     def next_box_id(self) -> int:
         """Get a new box id."""
-        id_ = self.box_ids[-1] + 1 if len(self.box_ids) > 0 else 1
+        id_ = None
+        if len(self.box_ids) == 0:
+            id_ = 1
+        else:
+            max_id = max(self.box_ids)
+            for i in range(1, max_id):
+                if i not in self.box_ids:
+                    id_ = i
+                    break
+            if id_ is None:
+                id_ = max_id + 1
         self.box_ids.append(id_)
         return id_
 
