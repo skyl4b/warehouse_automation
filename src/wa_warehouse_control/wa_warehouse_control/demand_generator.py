@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, Final, Literal
 import rclpy
 from rcl_interfaces import msg as rcl_msgs
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from std_srvs import srv as std_srvs
 from wa_interfaces import msg as wa_msgs
 
@@ -27,14 +28,11 @@ class DemandGenerator(Node):
     namespace: ClassVar[str] = "/wa"
     """Default node namespace."""
 
-    input_demand: int
-    """Current input demand."""
-
-    output_demand: int
-    """Current output demand."""
-
     demand_timer: Timer
     """Timer for demand generation."""
+
+    demand_publish_timer: Timer
+    """Timer for demand publishing."""
 
     demand_publisher: Publisher
     """Publisher for the current demand."""
@@ -44,20 +42,22 @@ class DemandGenerator(Node):
         min_demand_period: float,
         max_demand_period: float,
         input_probability: float = 0.5,
+        input_demand: int = 0,
+        output_demand: int = 0,
+        publish_demand_period: float = 2.0,
     ) -> None:
         super().__init__(  # type: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
         )
 
-        # Initialize demand
-        self.input_demand = 0
-        self.output_demand = 0
-
         # Parameters
         self.declare_parameter("min_demand_period", min_demand_period)
         self.declare_parameter("max_demand_period", max_demand_period)
         self.declare_parameter("input_probability", input_probability)
+        self.declare_parameter("input_demand", input_demand)
+        self.declare_parameter("output_demand", output_demand)
+        self.declare_parameter("publish_demand_period", publish_demand_period)
         self.create_subscription(  # Monitor set parameter
             rcl_msgs.ParameterEvent,
             "/parameter_events",
@@ -72,6 +72,15 @@ class DemandGenerator(Node):
                 self.max_demand_period,
             ),
             self.demand_callback,
+        )
+        self.demand_publish_timer = self.create_timer(
+            self.publish_demand_period,
+            lambda: self.demand_publisher.publish(
+                wa_msgs.Demand(
+                    input_demand=self.input_demand,
+                    output_demand=self.output_demand,
+                ),
+            ),
         )
 
         # Publishers
@@ -108,6 +117,43 @@ class DemandGenerator(Node):
         """Probability for an input demand (1 - probability output)."""
         return self.get_parameter("input_probability").value  # type: ignore[reportReturnType]
 
+    @property
+    def input_demand(self) -> int:
+        """Current input demand, boxes into the warehouse."""
+        return self.get_parameter("input_demand").value  # type: ignore[reportReturnType]
+
+    @input_demand.setter
+    def input_demand(self, input_demand: int) -> None:
+        """Set the current input demand."""
+        self.set_parameters([
+            Parameter(
+                "input_demand",
+                rclpy.Parameter.Type.INTEGER,
+                input_demand,
+            ),
+        ])
+
+    @property
+    def output_demand(self) -> int:
+        """Current output demand, boxes out of the warehouse."""
+        return self.get_parameter("output_demand").value  # type: ignore[reportReturnType]
+
+    @output_demand.setter
+    def output_demand(self, output_demand: int) -> None:
+        """Set the current output demand."""
+        self.set_parameters([
+            Parameter(
+                "output_demand",
+                rclpy.Parameter.Type.INTEGER,
+                output_demand,
+            ),
+        ])
+
+    @property
+    def publish_demand_period(self) -> float:
+        """Period for demand publishing."""
+        return self.get_parameter("publish_demand_period").value  # type: ignore[reportReturnType]
+
     def parameter_event_callback(
         self,
         message: rcl_msgs.ParameterEvent,
@@ -121,6 +167,18 @@ class DemandGenerator(Node):
                 }:
                     # Regenerate demand timer
                     self.demand_callback(increase_demand=False)
+                elif parameter.name == "publish_demand_period":
+                    # Regenerate publish demand timer
+                    self.demand_publish_timer.destroy()
+                    self.demand_publish_timer = self.create_timer(
+                        self.publish_demand_period,
+                        lambda: self.demand_publisher.publish(
+                            wa_msgs.Demand(
+                                input_demand=self.input_demand,
+                                output_demand=self.output_demand,
+                            ),
+                        ),
+                    )
 
     def demand_callback(self, increase_demand: bool = True) -> None:
         """Generate a demand."""
@@ -147,18 +205,10 @@ class DemandGenerator(Node):
             next_demand,
             self.demand_callback,
         )
-
-        # Publish demand
         self.get_logger().info(
             "Demand "
             f"{{input: {self.input_demand}, output: {self.output_demand}}}, "
             f"next in {next_demand:.2f} s",
-        )
-        self.demand_publisher.publish(
-            wa_msgs.Demand(
-                input_demand=self.input_demand,
-                output_demand=self.output_demand,
-            ),
         )
 
     def consume(
@@ -177,12 +227,6 @@ class DemandGenerator(Node):
             f"Consumed 1 {type_}, demand "
             f"{{input: {self.input_demand}, output: {self.output_demand}}}",
         )
-        self.demand_publisher.publish(
-            wa_msgs.Demand(
-                input_demand=self.input_demand,
-                output_demand=self.output_demand,
-            ),
-        )
         return response
 
 
@@ -199,8 +243,10 @@ def main() -> None:
     """Run the demand generator."""
     rclpy.init()
     node = DemandGenerator(
-        20.0,
-        60.0,
+        min_demand_period=20.0,
+        max_demand_period=60.0,
+        input_demand=2,
+        output_demand=0,
     )
 
     try:
