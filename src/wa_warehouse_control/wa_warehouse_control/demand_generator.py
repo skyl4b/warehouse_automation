@@ -37,7 +37,7 @@ class DemandGenerator(Node):
     demand_publisher: Publisher
     """Publisher for the current demand."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         min_demand_period: float,
         max_demand_period: float,
