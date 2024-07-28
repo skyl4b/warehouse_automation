@@ -416,7 +416,7 @@ https://github.com/ros-navigation/navigation2/blob/main/nav2_bringup/worlds/waff
       <sensor name="intel_realsense_r200_depth" type="depth">
         <always_on>1</always_on>
         <update_rate>5</update_rate>
-        <pose>0.064 -0.047 0.107 0 0 0</pose>
+        <pose>0.164 -0.047 0 0 0 0</pose>
         <camera name="realsense_depth_camera">
         </camera>
         <plugin name="intel_realsense_r200_depth_driver" filename="libgazebo_ros_camera.so">
