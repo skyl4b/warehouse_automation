@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 NAVIGATION_FRAME_ID: Final[str] = "map"
 """Relative frame for the automatic navigation."""
 
-CLOSE_RADIUS: Final[float] = 1.0
+CLOSE_RADIUS: Final[float] = 0.5
 """Radius to consider the robot able to pick up a box."""
 
 CONVEYOR_BELT_Y_DELTA: Final[float] = 0.8
