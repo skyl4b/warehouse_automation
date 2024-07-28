@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, cast
 import rclpy
 import yaml
 from geometry_msgs import msg as geometry_msgs
+from rcl_interfaces import msg as rcl_msgs
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from std_msgs import msg as std_msgs
@@ -16,6 +17,8 @@ from wa_warehouse_control.task_stats import Task
 from wa_warehouse_control.utils.map import BASE_MAP
 
 if TYPE_CHECKING:
+    from rclpy.timer import Timer
+
     from wa_warehouse_control.utils.map import (
         BoxId,
         ConveyorBelt,
@@ -50,6 +53,9 @@ class TaskTransmitter(Node):
     active_tasks: list[Task]
     """Active tasks being executed by robots."""
 
+    broadcast_timer: Timer
+    """Timer for demand generation."""
+
     def __init__(self, broadcast_period: float, map_: Map) -> None:
         super().__init__(  # type: ignore[reportArgumentType]
             node_name=self.name,
@@ -66,8 +72,13 @@ class TaskTransmitter(Node):
 
         # Parameters
         self.declare_parameter("broadcast_period", broadcast_period)
-        # TODO: self.add_on_set_parameters_callback(callback)
         self.declare_parameter("map", yaml.safe_dump(map_))
+        self.create_subscription(  # Monitor set parameter
+            rcl_msgs.ParameterEvent,
+            "/parameter_events",
+            self.parameter_event_callback,
+            10,
+        )
 
         # Subscribers
         self.create_subscription(
@@ -90,7 +101,10 @@ class TaskTransmitter(Node):
         )
 
         # Timers
-        self.create_timer(broadcast_period, self.broadcast_callback)
+        self.broadcast_timer = self.create_timer(
+            broadcast_period,
+            self.broadcast_callback,
+        )
 
         # Publishers
         self.broadcast = self.create_publisher(
@@ -132,6 +146,25 @@ class TaskTransmitter(Node):
         return yaml.safe_load(
             self.get_parameter("map").value,  # type: ignore[reportIncompatibleType]
         )
+
+    def parameter_event_callback(
+        self,
+        message: rcl_msgs.ParameterEvent,
+    ) -> None:
+        """Monitor changes to this node's parameters to update the timer."""
+        if message.node == self.get_fully_qualified_name():
+            for parameter in message.changed_parameters:
+                if parameter.name == "broadcast_period":
+                    # Regenerate broadcast timer
+                    self.get_logger().info(
+                        "Updating timer to "
+                        f"broadcast_period {self.broadcast_period}",
+                    )
+                    self.broadcast_timer.destroy()
+                    self.broadcast_timer = self.create_timer(
+                        self.broadcast_period,
+                        self.broadcast_callback,
+                    )
 
     def update_map(self, map_: Map) -> None:
         """Update the map of the warehouse."""
