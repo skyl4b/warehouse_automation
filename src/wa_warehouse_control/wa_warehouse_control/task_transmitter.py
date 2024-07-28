@@ -18,6 +18,8 @@ from wa_warehouse_control.task_stats import Task
 from wa_warehouse_control.utils.map import BASE_MAP
 
 if TYPE_CHECKING:
+    from rclpy.client import Client
+    from rclpy.publisher import Publisher
     from rclpy.timer import Timer
 
     from wa_warehouse_control.utils.map import (
@@ -56,6 +58,21 @@ class TaskTransmitter(Node):
 
     broadcast_timer: Timer
     """Timer for demand generation."""
+
+    broadcast: Publisher
+    """Publisher for broadcasting tasks."""
+
+    box_order: Client
+    """Client for ordering boxes."""
+
+    box_send: Client
+    """Client for sending boxes."""
+
+    consume_input_demand: Client
+    """Client for consuming input demands."""
+
+    consume_output_demand: Client
+    """Client for consuming output demands."""
 
     def __init__(self, broadcast_period: float, map_: Map) -> None:
         super().__init__(  # type: ignore[reportArgumentType]
@@ -142,7 +159,7 @@ class TaskTransmitter(Node):
             )
 
         # Services
-        self.confirm = self.create_service(
+        self.create_service(
             wa_srvs.TaskConfirmation,
             f"{self.get_name()}/task_confirmation",
             self.confirmation_callback,
