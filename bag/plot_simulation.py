@@ -1,44 +1,87 @@
+#!/usr/bin/env python3
 """Utilities to create visualizations for the warehouse automation project."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from bag_display import parse_bag
 from cycler import cycler
+from wa_interfaces import msg as wa_msgs
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 def plot_simulation() -> None:
     """Plot simulation results from the warehouse automation project."""
     configure_matplotlib_for_scientific_plots()
 
-    # Sample data
+    # Parse bag recording
     bag = parse_bag(Path(__file__).parent / "recordings" / "demand")
-    t = [item[2] for item in bag]
+
+    # Demand plot
+    plot_demand(
+        [
+            (time, cast(wa_msgs.Demand, demand))
+            for topic, demand, time in bag
+            if topic == "/wa/demand_generator/demand"
+        ],
+        [
+            (time, cast(wa_msgs.Demand, demand))
+            for topic, demand, time in bag
+            if topic == "/wa/demand_generator/unbounded_demand"
+        ],
+    )
+
+
+def plot_demand(
+    demand: list[tuple[datetime, wa_msgs.Demand]],
+    unbounded_demand: list[tuple[datetime, wa_msgs.Demand]],
+) -> None:
+    """Plot the demand of the warehouse during the simulation."""
+    # Time
+    t_d = [time for time, _ in demand]
+    t_u = [time for time, _ in unbounded_demand]
 
     # Demand
-    d_i = [item[1].input_demand for item in bag]
-    d_o = [item[1].output_demand for item in bag]
+    d_i = [message.input_demand for _, message in demand]
+    d_o = [message.output_demand for _, message in demand]
 
     # Unbounded demand
-    u_i = accumulate_positive(d_i)
-    u_o = accumulate_positive(d_o)
+    u_i = [message.input_demand for _, message in unbounded_demand]
+    u_o = [message.output_demand for _, message in unbounded_demand]
 
     # Plot
     plt.figure()
 
     # Relative datetimes
-    start = mdates.date2num(t[0])
-    t = [mdates.date2num(t_i) - start for t_i in t]
+    s_d = mdates.date2num(t_d[0])
+    t_d = [mdates.date2num(t_i) - s_d for t_i in t_d]
+    s_u = mdates.date2num(t_u[0])
+    t_u = [mdates.date2num(t_i) - s_u for t_i in t_u]
 
     # Zeroth order interpolation plot
-    plt.plot(t, d_i, label=r"$D_i(t)$", drawstyle="steps-post")
-    plt.plot(t, d_o, label=r"$D_o(t)$", drawstyle="steps-post")
-    plt.plot(t, u_i, label=r"$U_i(t)$", drawstyle="steps-post", linestyle="--")
-    plt.plot(t, u_o, label=r"$U_o(t)$", drawstyle="steps-post", linestyle="--")
+    plt.plot(t_d, d_i, label=r"$D_i(t)$", drawstyle="steps-post")
+    plt.plot(t_d, d_o, label=r"$D_o(t)$", drawstyle="steps-post")
+    plt.plot(
+        t_u,
+        u_i,
+        label=r"$U_i(t)$",
+        drawstyle="steps-post",
+        linestyle="--",
+    )
+    plt.plot(
+        t_u,
+        u_o,
+        label=r"$U_o(t)$",
+        drawstyle="steps-post",
+        linestyle="--",
+    )
 
     plt.title("Demand plot")
     plt.xlabel(r"$t$")

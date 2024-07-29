@@ -37,6 +37,15 @@ class DemandGenerator(Node):
     demand_publisher: Publisher
     """Publisher for the current demand."""
 
+    unbounded_input_demand: float
+    """The unbound demand (never decreasing) for input tasks."""
+
+    unbounded_output_demand: float
+    """The unbound demand (never decreasing) for output tasks."""
+
+    unbounded_demand_publisher: Publisher
+    """Publisher for the current unbounded demand."""
+
     def __init__(  # noqa: PLR0913, PLR0917
         self,
         min_demand_period: float,
@@ -65,6 +74,12 @@ class DemandGenerator(Node):
             10,
         )
 
+        # Unbounded demand initialization,
+        # they should start with the same values as
+        # input and output demands
+        self.unbounded_input_demand = self.input_demand
+        self.unbounded_output_demand = self.output_demand
+
         # Timers
         self.demand_timer = self.create_timer(
             restricted_normal_distribution(
@@ -75,18 +90,18 @@ class DemandGenerator(Node):
         )
         self.demand_publish_timer = self.create_timer(
             self.publish_demand_period,
-            lambda: self.demand_publisher.publish(
-                wa_msgs.Demand(
-                    input_demand=self.input_demand,
-                    output_demand=self.output_demand,
-                ),
-            ),
+            self.publish_demand_callback,
         )
 
         # Publishers
         self.demand_publisher = self.create_publisher(
             wa_msgs.Demand,
             f"{self.get_name()}/demand",
+            10,
+        )
+        self.unbounded_demand_publisher = self.create_publisher(
+            wa_msgs.Demand,
+            f"{self.get_name()}/unbounded_demand",
             10,
         )
 
@@ -172,12 +187,7 @@ class DemandGenerator(Node):
                     self.demand_publish_timer.destroy()
                     self.demand_publish_timer = self.create_timer(
                         self.publish_demand_period,
-                        lambda: self.demand_publisher.publish(
-                            wa_msgs.Demand(
-                                input_demand=self.input_demand,
-                                output_demand=self.output_demand,
-                            ),
-                        ),
+                        self.publish_demand_callback,
                     )
 
     def demand_callback(self, increase_demand: bool = True) -> None:
@@ -189,9 +199,17 @@ class DemandGenerator(Node):
                     self.input_demand + 1,
                     MAX_DEMAND,
                 )
+                self.unbounded_input_demand = min(
+                    self.unbounded_input_demand + 1,
+                    MAX_DEMAND,
+                )
             else:
                 self.output_demand = min(
                     self.output_demand + 1,
+                    MAX_DEMAND,
+                )
+                self.unbounded_output_demand = min(
+                    self.unbounded_output_demand + 1,
                     MAX_DEMAND,
                 )
 
@@ -209,6 +227,21 @@ class DemandGenerator(Node):
             "Demand "
             f"{{input: {self.input_demand}, output: {self.output_demand}}}, "
             f"next in {next_demand:.2f} s",
+        )
+
+    def publish_demand_callback(self) -> None:
+        """Publish the current demand."""
+        self.demand_publisher.publish(
+            wa_msgs.Demand(
+                input_demand=self.input_demand,
+                output_demand=self.output_demand,
+            ),
+        )
+        self.unbounded_demand_publisher.publish(
+            wa_msgs.Demand(
+                input_demand=self.unbounded_input_demand,
+                output_demand=self.unbounded_output_demand,
+            ),
         )
 
     def consume(
@@ -245,7 +278,7 @@ def main() -> None:
     node = DemandGenerator(
         min_demand_period=20.0,
         max_demand_period=60.0,
-        input_demand=2,
+        input_demand=0,
         output_demand=0,
     )
 
