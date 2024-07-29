@@ -53,5 +53,5 @@ qtcreator-*
 CATKIN_IGNORE
 
 # Bag recording directory
-bag/recordings/*
-!bag/recordings/.gitkeep
+experiments/bag_recordings/*
+!experiments/bag_recordings/.gitkeep

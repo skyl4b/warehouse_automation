@@ -134,7 +134,7 @@ gazebo world="empty":
 
 # Record a Ros2 bag of provided topics
 bag-record name *topics="--all":
-    ros2 bag record --use-sim-time -o bag/recordings/{{name}} {{topics}}
+    ros2 bag record --use-sim-time -o experiments/bag_recordings/{{name}} {{topics}}
 
 # Launch the warehouse automation simulation
 launch *args:
