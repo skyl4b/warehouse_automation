@@ -132,6 +132,11 @@ gazebo world="empty":
         -s libgazebo_ros_force_system.so \
         "$world"
 
+# Record a Ros2 bag of provided topics
+bag-record name *topics="--all":
+    ros2 bag record --use-sim-time -o bag/recordings/{{name}} {{topics}}
+
+
 # Start a Nix shell with the ROS2 environment for development
 nix:
     nix develop --command just repl
