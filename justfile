@@ -140,6 +140,9 @@ bag-record name *topics="--all":
 launch *args:
     ros2 launch wa_bringup simulation.launch.py {{args}}
 
+# Display launch arguments for the simulation launch
+launch-help: (launch "-s")
+
 # Start a Nix shell with the ROS2 environment for development
 nix:
     nix develop --command just repl
