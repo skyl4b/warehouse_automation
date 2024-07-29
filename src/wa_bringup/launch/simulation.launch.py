@@ -312,35 +312,35 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "headless",
                 default_value="False",
-                description="Run in headless mode",
+                description="Run in headless mode.",
             ),
             DeclareLaunchArgument(
                 "warehouse_automation",
                 default_value="True",
                 description="Whether the warehouse automation should be "
-                "initialized, spawn moves, create tasks, allocate robots.",
+                "initialized: spawn boxes, create tasks, allocate robots.",
             ),
             DeclareLaunchArgument(
                 "n_robots",
                 default_value="1",
-                description="The number of robots to be spawned immediatly",
+                description="The number of robots to be spawned immediatly.",
             ),
             DeclareLaunchArgument(
                 "populate",
                 default_value="0101010101",
                 description="The boxes in storage to populate on startup, "
-                "either a binary string, 'all' or 'none'",
+                "either a binary string, 'all' or 'none'.",
             ),
             DeclareLaunchArgument(
                 "automatic_navigation",
                 default_value="all",
                 description="For which robots should be moved automatically, "
-                "either a binary string, 'all', 'none' or 'not {index}'",
+                "either a binary string, 'all', 'none' or 'not {index}'.",
             ),
             DeclareLaunchArgument(
                 "rviz",
                 default_value="False",
-                description="Start rviz to control the first robot",
+                description="Start rviz to monitor the first robot.",
             ),
             # Gazebo server
             ExecuteProcess(
