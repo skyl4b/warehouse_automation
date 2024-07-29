@@ -136,6 +136,9 @@ gazebo world="empty":
 bag-record name *topics="--all":
     ros2 bag record --use-sim-time -o bag/recordings/{{name}} {{topics}}
 
+# Launch the warehouse automation simulation
+launch *args:
+    ros2 launch wa_bringup simulation.launch.py {{args}}
 
 # Start a Nix shell with the ROS2 environment for development
 nix:
