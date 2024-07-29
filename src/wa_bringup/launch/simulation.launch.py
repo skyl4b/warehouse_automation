@@ -385,24 +385,30 @@ def generate_launch_description() -> LaunchDescription:
             # Spawn robots
             OpaqueFunction(function=spawn_robots),
             # Rviz for robot control and visualization
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution([
-                        FindPackageShare("nav2_bringup"),
-                        "launch",
-                        "rviz_launch.py",
-                    ]),
-                ),
-                launch_arguments={
-                    "use_sim_time": "true",
-                    "namespace": f"{NAMESPACE}/mobilebot_1/",
-                    "use_namespace": "True",
-                    "rviz_config_file": PathJoinSubstitution([
-                        wa_environment,
-                        "rviz",
-                        "mobilebot_1.rviz",
-                    ]),
-                }.items(),
+            # A group action is used for scoping
+            GroupAction(
+                [
+                    IncludeLaunchDescription(
+                        PythonLaunchDescriptionSource(
+                            PathJoinSubstitution([
+                                FindPackageShare("nav2_bringup"),
+                                "launch",
+                                "rviz_launch.py",
+                            ]),
+                        ),
+                        launch_arguments={
+                            "use_sim_time": "true",
+                            "namespace": f"{NAMESPACE}/mobilebot_1/",
+                            "use_namespace": "True",
+                            "rviz_config": PathJoinSubstitution([
+                                wa_environment,
+                                "rviz",
+                                "mobilebot_1.rviz",
+                            ]),
+                        }.items(),
+                    ),
+                ],
+                forwarding=False,
                 condition=IfCondition(LaunchConfiguration("rviz")),
             ),
             # Populate storage with inital boxes
