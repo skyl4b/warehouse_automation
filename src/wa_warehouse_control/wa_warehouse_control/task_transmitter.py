@@ -86,7 +86,7 @@ class TaskTransmitter(Node):
         map_: Map,
         publish_map_period: float = 2.0,
     ) -> None:
-        super().__init__(  # type: ignore[reportArgumentType]
+        super().__init__(  # pyright: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
         )
@@ -189,19 +189,17 @@ class TaskTransmitter(Node):
     @property
     def broadcast_period(self) -> float:
         """Broadcast period of tasks."""
-        return self.get_parameter("broadcast_period").value  # type: ignore[reportIncompatibleType]
+        return cast(float, self.get_parameter("broadcast_period").value)
 
     @property
     def map(self) -> Map:
         """Map of the warehouse."""
-        return yaml.safe_load(
-            self.get_parameter("map").value,  # type: ignore[reportIncompatibleType]
-        )
+        return yaml.safe_load(cast(str, self.get_parameter("map").value))
 
     @property
     def publish_map_period(self) -> float:
         """Publish period of the map."""
-        return self.get_parameter("publish_map_period").value  # type: ignore[reportIncompatibleType]
+        return cast(float, self.get_parameter("publish_map_period").value)
 
     def parameter_event_callback(
         self,
@@ -419,7 +417,7 @@ class TaskTransmitter(Node):
             task_type,
             start,
             end,
-            box_id,  # type: ignore[reportArgumentType]
+            box_id,  # pyright: ignore[reportArgumentType]
         )
         self.get_logger().info(
             f"Generating {task.type_} task {task.uid} from "

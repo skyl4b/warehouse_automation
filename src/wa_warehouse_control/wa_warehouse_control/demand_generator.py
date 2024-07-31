@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, ClassVar, Final, Literal
+from typing import TYPE_CHECKING, ClassVar, Final, Literal, cast
 
 import rclpy
 from rcl_interfaces import msg as rcl_msgs
@@ -55,7 +55,7 @@ class DemandGenerator(Node):
         output_demand: int = 0,
         publish_demand_period: float = 2.0,
     ) -> None:
-        super().__init__(  # type: ignore[reportArgumentType]
+        super().__init__(  # pyright: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
         )
@@ -111,7 +111,7 @@ class DemandGenerator(Node):
                 std_srvs.Empty,
                 f"{self.get_name()}/consume/{type_}",
                 lambda request, response, type_=type_: self.consume(
-                    request,  # type: ignore[reportArgumentType]
+                    request,  # pyright: ignore[reportArgumentType]
                     response,
                     type_,
                 ),
@@ -120,22 +120,22 @@ class DemandGenerator(Node):
     @property
     def min_demand_period(self) -> float:
         """Minimum period for the demand."""
-        return self.get_parameter("min_demand_period").value  # type: ignore[reportReturnType]
+        return cast(float, self.get_parameter("min_demand_period").value)
 
     @property
     def max_demand_period(self) -> float:
         """Maximum period for the demand."""
-        return self.get_parameter("max_demand_period").value  # type: ignore[reportReturnType]
+        return cast(float, self.get_parameter("max_demand_period").value)
 
     @property
     def input_probability(self) -> float:
         """Probability for an input demand (1 - probability output)."""
-        return self.get_parameter("input_probability").value  # type: ignore[reportReturnType]
+        return cast(float, self.get_parameter("input_probability").value)
 
     @property
     def input_demand(self) -> int:
         """Current input demand, boxes into the warehouse."""
-        return self.get_parameter("input_demand").value  # type: ignore[reportReturnType]
+        return cast(int, self.get_parameter("input_demand").value)
 
     @input_demand.setter
     def input_demand(self, input_demand: int) -> None:
@@ -151,7 +151,7 @@ class DemandGenerator(Node):
     @property
     def output_demand(self) -> int:
         """Current output demand, boxes out of the warehouse."""
-        return self.get_parameter("output_demand").value  # type: ignore[reportReturnType]
+        return cast(int, self.get_parameter("output_demand").value)
 
     @output_demand.setter
     def output_demand(self, output_demand: int) -> None:
@@ -167,7 +167,7 @@ class DemandGenerator(Node):
     @property
     def publish_demand_period(self) -> float:
         """Period for demand publishing."""
-        return self.get_parameter("publish_demand_period").value  # type: ignore[reportReturnType]
+        return cast(float, self.get_parameter("publish_demand_period").value)
 
     def parameter_event_callback(
         self,

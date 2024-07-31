@@ -70,7 +70,7 @@ class Mobilebot(Node):
         initial_position: tuple[float, float] = (0.0, 0.0),
         close_radius: float = CLOSE_RADIUS,
     ) -> None:
-        super().__init__(  # type: ignore[reportArgumentType]
+        super().__init__(  # pyright: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
         )
@@ -111,7 +111,7 @@ class Mobilebot(Node):
         # Robot navigator
         self.navigator = Navigator(
             namespace=self.get_fully_qualified_name(),
-            use_sim_time=self.get_parameter("use_sim_time").value,  # type: ignore[reportArgumentType]
+            use_sim_time=cast(bool, self.get_parameter("use_sim_time").value),
         )
         self.set_initial_position(self.initial_position)
         self.navigator.waitUntilNav2Active()
@@ -156,17 +156,20 @@ class Mobilebot(Node):
     @property
     def goal_check_period(self) -> float:
         """Goal check period of the robot."""
-        return self.get_parameter("goal_check_period").value  # type: ignore[reportIncompatibleType]
+        return cast(float, self.get_parameter("goal_check_period").value)
 
     @property
     def initial_position(self) -> tuple[float, float]:
         """Initial position of the robot."""
-        return self.get_parameter("initial_position").value  # type: ignore[reportIncompatibleType]
+        return cast(
+            tuple[float, float],
+            self.get_parameter("initial_position").value,
+        )
 
     @property
     def close_radius(self) -> float:
         """How close must the robot get to the goal."""
-        return self.get_parameter("close_radius").value  # type: ignore[reportIncompatibleType]
+        return cast(float, self.get_parameter("close_radius").value)
 
     def parameter_event_callback(
         self,
