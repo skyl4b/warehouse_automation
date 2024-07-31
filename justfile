@@ -152,7 +152,9 @@ docker-repl:
     @# Allow X11 forwarding to root
     xhost +SI:localuser:root
     -docker run --rm -it \
+        --name warehouse_automation \
         -v {{ dir }}:/workspace \
         -v /dev/dri:/dev/dri \
         -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix --ipc host \
+        -e QT_X11_NO_MITSHM=1 \
         osrf/ros:humble-desktop-full bash
