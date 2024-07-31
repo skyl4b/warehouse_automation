@@ -176,7 +176,20 @@ def spawn_robots(
                 output="screen",
                 namespace=NAMESPACE,
                 parameters=[
-                    {"use_sim_time": True, "initial_position": [0.0, y[i]]},
+                    {
+                        "use_sim_time": True,
+                        "initial_position": [0.0, y[i]],
+                        "goal_check_period": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("goal_check_period"),
+                            ")",
+                        ]),
+                        "close_radius": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("close_radius"),
+                            ")",
+                        ]),
+                    },
                 ],
                 condition=IfCondition(
                     LaunchConfiguration("warehouse_automation"),
@@ -275,6 +288,11 @@ def populate_storage(context: LaunchContext) -> list[Node]:
                         LaunchConfiguration("broadcast_period"),
                         ")",
                     ]),
+                    "publish_map_period": PythonExpression([
+                        "float(",
+                        LaunchConfiguration("publish_map_period"),
+                        ")",
+                    ]),
                 },
             ],
             condition=IfCondition(
@@ -369,9 +387,41 @@ def generate_launch_description() -> LaunchDescription:
                 " is an input demand (1 - output).",
             ),
             DeclareLaunchArgument(
+                "initial_input_demand",
+                default_value="0",
+                description="The initial input demand of the warehouse.",
+            ),
+            DeclareLaunchArgument(
+                "initial_output_demand",
+                default_value="0",
+                description="The initial output demand of the warehouse.",
+            ),
+            DeclareLaunchArgument(
+                "publish_demand_period",
+                default_value="2.0",
+                description="Period for publishing the current demand.",
+            ),
+            DeclareLaunchArgument(
                 "broadcast_period",
                 default_value="2.0",
                 description="Period for task broadcasting to robots.",
+            ),
+            DeclareLaunchArgument(
+                "publish_map_period",
+                default_value="2.0",
+                description="Period for publishing task_transmitters map.",
+            ),
+            DeclareLaunchArgument(
+                "goal_check_period",
+                default_value="0.5",
+                description="Period for checking if "
+                "robot goals have been reached.",
+            ),
+            DeclareLaunchArgument(
+                "close_radius",
+                default_value="0.5",
+                description="Radius tolerance for checking "
+                "if robot goals have been reached.",
             ),
             # Gazebo server
             ExecuteProcess(
@@ -470,6 +520,21 @@ def generate_launch_description() -> LaunchDescription:
                         "input_probability": PythonExpression([
                             "float(",
                             LaunchConfiguration("input_probability"),
+                            ")",
+                        ]),
+                        "input_demand": PythonExpression([
+                            "int(",
+                            LaunchConfiguration("initial_input_demand"),
+                            ")",
+                        ]),
+                        "output_demand": PythonExpression([
+                            "int(",
+                            LaunchConfiguration("initial_output_demand"),
+                            ")",
+                        ]),
+                        "publish_demand_period": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("publish_demand_period"),
                             ")",
                         ]),
                     },
