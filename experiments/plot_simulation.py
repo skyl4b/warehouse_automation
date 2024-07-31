@@ -22,7 +22,7 @@ def plot_simulation() -> None:
     configure_matplotlib_for_scientific_plots()
 
     # Parse bag recording
-    bag = parse_bag(Path(__file__).parent / "recordings" / "demand")
+    bag = parse_bag(Path(__file__).parent / "bag_recordings" / "demand")
 
     # Demand plot
     plot_demand(
@@ -42,6 +42,7 @@ def plot_simulation() -> None:
 def plot_demand(
     demand: list[tuple[datetime, wa_msgs.Demand]],
     unbounded_demand: list[tuple[datetime, wa_msgs.Demand]],
+    time_unit: str = "seconds",  # 'seconds', 'minutes', 'hours', etc.
 ) -> None:
     """Plot the demand of the warehouse during the simulation."""
     # Time
@@ -56,42 +57,48 @@ def plot_demand(
     u_i = [message.input_demand for _, message in unbounded_demand]
     u_o = [message.output_demand for _, message in unbounded_demand]
 
+    # Convert to relative time
+    s_d = t_d[0]
+    t_d = [(t_i - s_d).total_seconds() for t_i in t_d]
+    s_u = t_u[0]
+    t_u = [(t_i - s_u).total_seconds() for t_i in t_u]
+
     # Plot
-    plt.figure()
+    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
-    # Relative datetimes
-    s_d = mdates.date2num(t_d[0])
-    t_d = [mdates.date2num(t_i) - s_d for t_i in t_d]
-    s_u = mdates.date2num(t_u[0])
-    t_u = [mdates.date2num(t_i) - s_u for t_i in t_u]
-
-    # Zeroth order interpolation plot
-    plt.plot(t_d, d_i, label=r"$D_i(t)$", drawstyle="steps-post")
-    plt.plot(t_d, d_o, label=r"$D_o(t)$", drawstyle="steps-post")
-    plt.plot(
+    # Zeroth order interpolation plot for input demand
+    ax1.plot(t_d, d_i, label=r"$D_i(t)$", drawstyle="steps-post", color="k")
+    ax1.plot(
         t_u,
         u_i,
         label=r"$U_i(t)$",
         drawstyle="steps-post",
         linestyle="--",
+        color="darkblue",
     )
-    plt.plot(
+    ax1.set_xlabel(f"Time [{time_unit}]")
+    ax1.set_ylabel(r"Input demand [box units]")
+    ax1.set_ylim((-0.25, max(*u_i, *u_o) + 1))
+    ax1.set_yticks(list(range(max(*u_i, *u_o) + 1)))
+    ax1.legend()
+
+    # Zeroth order interpolation plot for output demand
+    ax2.plot(t_d, d_o, label=r"$D_o(t)$", drawstyle="steps-post", color="k")
+    ax2.plot(
         t_u,
         u_o,
         label=r"$U_o(t)$",
         drawstyle="steps-post",
         linestyle="--",
+        color="darkblue",
     )
+    ax2.set_xlabel(f"Time [{time_unit}]")
+    ax2.set_ylabel(r"Output demand [box units]")
+    ax2.set_ylim((-0.25, max(*u_i, *u_o) + 1))
+    ax2.set_yticks(list(range(max(*u_i, *u_o) + 1)))
+    ax2.legend()
 
-    plt.title("Demand plot")
-    plt.xlabel(r"$t$")
-    plt.ylabel(r"$D(t)$")
-    plt.ylim((-1, max(*u_i, *u_o) + 1))
-    plt.yticks(list(range(max(*u_i, *u_o) + 1)))
-
-    plt.legend()
-    plt.tight_layout()
-    # plt.savefig("example_plot.pdf")
+    plt.tight_layout(pad=5.0)
     plt.show()
 
 
