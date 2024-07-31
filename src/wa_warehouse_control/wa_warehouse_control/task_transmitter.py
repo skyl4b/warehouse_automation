@@ -7,13 +7,14 @@ import rclpy
 import yaml
 from geometry_msgs import msg as geometry_msgs
 from rcl_interfaces import msg as rcl_msgs
-from rclpy.node import Node
 from rclpy.parameter import Parameter
 from std_msgs import msg as std_msgs
 from std_srvs import srv as std_srvs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
 
+from wa_warehouse_control.sct.models import TASK_TRANSMITER_MODEL
+from wa_warehouse_control.sct.plant_node import PlantNode
 from wa_warehouse_control.task_stats import Task
 from wa_warehouse_control.utils.map import BASE_MAP
 
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     )
 
 
-class TaskTransmitter(Node):
+class TaskTransmitter(PlantNode):
     """Task transmitter and allocator for robots.
 
     In the warehouse automation project, the tasks of moving boxes are
@@ -86,9 +87,9 @@ class TaskTransmitter(Node):
         map_: Map,
         publish_map_period: float = 2.0,
     ) -> None:
-        super().__init__(  # pyright: ignore[reportArgumentType]
-            node_name=self.name,
-            namespace=self.namespace,
+        super().__init__(
+            state=TASK_TRANSMITER_MODEL["initial_state"],
+            transitions=TASK_TRANSMITER_MODEL["transitions"],
         )
 
         # Demand tracker

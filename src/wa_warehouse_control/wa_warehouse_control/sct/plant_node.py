@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Final
+from typing import TYPE_CHECKING, Callable, ClassVar, Final, cast
 
 import rclpy
 import yaml
@@ -16,6 +16,8 @@ from wa_warehouse_control.sct.automaton import (
 
 if TYPE_CHECKING:
     from rclpy.publisher import Publisher
+
+    from wa_warehouse_control.sct.models import AutomatonModel
 
 SPECIAL_DELIMITER: Final[str] = "|"
 """A special character to delimit automata message sections."""
@@ -54,16 +56,28 @@ class PlantNode(Node):
 
     def __init__(
         self,
-        state: str,
-        transitions: AutomatonTransitions,
+        state: str | None = None,
+        transitions: AutomatonTransitions | None = None,
         expected_supervisors: int = 0,
+        template: Callable[[int], AutomatonModel] | None = None,
     ) -> None:
+        if (state is None or transitions is None) and template is None:
+            raise ValueError(
+                "Either a template or state and transitions must be provided",
+            )
+
         super().__init__(  # pyright: ignore[reportArgumentType]
             node_name=self.name,
             namespace=self.namespace,
         )
 
         # Parameters
+        self.declare_parameter("template_id", -1)
+        # Handle template
+        if template is not None:
+            model = template(self.template_id)
+            state = model["initial_state"]
+            transitions = model["transitions"]
         self.declare_parameter("state", state)
         self.declare_parameter("transitions", yaml.safe_dump(transitions))
         self.declare_parameter("expected_supervisors", expected_supervisors)
@@ -101,21 +115,26 @@ class PlantNode(Node):
         )
 
     @property
+    def template_id(self) -> int:
+        """The template id of the model on instantiation."""
+        return cast(int, self.get_parameter("template_id").value)
+
+    @property
     def state(self) -> str:
         """The last externally set state of the plant automaton."""
-        return self.get_parameter("state").value  # pyright: ignore[reportReturnType]
+        return cast(str, self.get_parameter("state").value)
 
     @property
     def transitions(self) -> AutomatonTransitions:
         """The transitions that define the plant automaton."""
         return yaml.safe_load(
-            self.get_parameter("transitions").value,  # pyright: ignore[reportArgumentType]
+            cast(str, self.get_parameter("transitions").value),
         )
 
     @property
     def expected_supervisors(self) -> int:
         """The expected number of supervisors."""
-        return self.get_parameter("expected_supervisors").value  # pyright: ignore[reportReturnType]
+        return cast(int, self.get_parameter("expected_supervisors").value)
 
     def parameter_event_callback(
         self,

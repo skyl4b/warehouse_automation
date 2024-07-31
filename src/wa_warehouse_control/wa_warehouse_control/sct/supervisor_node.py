@@ -100,20 +100,22 @@ class SupervisorNode(Node):
             self.get_logger().info("Waiting for plant to be available")
         self.register.call_async(
             wa_srvs.RegisterSupervisor.Request(
-                enabled_events=SPECIAL_DELIMITER.join(self.automaton.current_events()),
+                enabled_events=SPECIAL_DELIMITER.join(
+                    self.automaton.current_events(),
+                ),
             ),
         ).add_done_callback(self.register_callback)
 
     @property
     def state(self) -> str:
         """The last externally set state of the supervisor automaton."""
-        return self.get_parameter("state").value  # pyright: ignore[reportReturnType]
+        return cast(str, self.get_parameter("state").value)
 
     @property
     def transitions(self) -> AutomatonTransitions:
         """The transitions that define the supervisor automaton."""
         return yaml.safe_load(
-            self.get_parameter("transitions").value,  # pyright: ignore[reportArgumentType]
+            cast(str, self.get_parameter("transitions").value),
         )
 
     def parameter_event_callback(

@@ -12,6 +12,8 @@ from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
 
+from wa_warehouse_control.sct.models import get_robot_model
+from wa_warehouse_control.sct.plant_node import PlantNode
 from wa_warehouse_control.utils.navigator import Navigator
 
 if TYPE_CHECKING:
@@ -28,7 +30,7 @@ CONVEYOR_BELT_Y_DELTA: Final[float] = 0.8
 """Delta for the pick up point of a conveyor belt."""
 
 
-class Mobilebot(Node):
+class Mobilebot(PlantNode):
     """A mobile robot in the warehouse automation project.
 
     The mobile robots are the entities responsible for moving the
@@ -70,10 +72,7 @@ class Mobilebot(Node):
         initial_position: tuple[float, float] = (0.0, 0.0),
         close_radius: float = CLOSE_RADIUS,
     ) -> None:
-        super().__init__(  # pyright: ignore[reportArgumentType]
-            node_name=self.name,
-            namespace=self.namespace,
-        )
+        super().__init__(template=get_robot_model)
 
         # Parameters
         self.declare_parameter("goal_check_period", goal_check_period)
