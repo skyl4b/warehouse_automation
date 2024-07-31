@@ -132,7 +132,7 @@ class TaskTransmitter(Node):
 
         # Timers
         self.broadcast_timer = self.create_timer(
-            broadcast_period,
+            self.broadcast_period,
             self.broadcast_callback,
         )
         self.publish_map_timer = self.create_timer(

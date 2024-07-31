@@ -266,7 +266,17 @@ def populate_storage(context: LaunchContext) -> list[Node]:
             name="task_transmitter",
             output="screen",
             namespace=NAMESPACE,
-            parameters=[{"use_sim_time": True, "map": yaml.safe_dump(map_)}],
+            parameters=[
+                {
+                    "use_sim_time": True,
+                    "map": yaml.safe_dump(map_),
+                    "broadcast_period": PythonExpression([
+                        "float(",
+                        LaunchConfiguration("broadcast_period"),
+                        ")",
+                    ]),
+                },
+            ],
             condition=IfCondition(
                 LaunchConfiguration("warehouse_automation"),
             ),
@@ -341,6 +351,27 @@ def generate_launch_description() -> LaunchDescription:
                 "rviz",
                 default_value="False",
                 description="Start rviz to monitor the first robot.",
+            ),
+            DeclareLaunchArgument(
+                "min_demand_period",
+                default_value="10.0",
+                description="Minimum time for a demand of input / output.",
+            ),
+            DeclareLaunchArgument(
+                "max_demand_period",
+                default_value="30.0",
+                description="Maximum time for a demand of input / output.",
+            ),
+            DeclareLaunchArgument(
+                "input_probability",
+                default_value="0.5",
+                description="Probability that a demand"
+                " is an input demand (1 - output).",
+            ),
+            DeclareLaunchArgument(
+                "broadcast_period",
+                default_value="2.0",
+                description="Period for task broadcasting to robots.",
             ),
             # Gazebo server
             ExecuteProcess(
@@ -423,7 +454,26 @@ def generate_launch_description() -> LaunchDescription:
                 condition=IfCondition(
                     LaunchConfiguration("warehouse_automation"),
                 ),
-                parameters=[{"use_sim_time": True}],
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "min_demand_period": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("min_demand_period"),
+                            ")",
+                        ]),
+                        "max_demand_period": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("max_demand_period"),
+                            ")",
+                        ]),
+                        "input_probability": PythonExpression([
+                            "float(",
+                            LaunchConfiguration("input_probability"),
+                            ")",
+                        ]),
+                    },
+                ],
             ),
         ],
     )
