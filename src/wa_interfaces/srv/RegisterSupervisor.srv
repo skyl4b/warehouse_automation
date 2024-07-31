@@ -1,0 +1,11 @@
+# Register supervisor protocol
+#
+# Defines a service used by a supervisor to register itself
+# as supervising a specific plant. The supervisor provides the
+# enabled events in its current state and the plant returns the
+# id of the supervisor, so that it may be preprended in each
+# message it sends.
+
+string enabled_events
+---
+uint8 supervisor_id

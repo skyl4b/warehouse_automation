@@ -34,6 +34,8 @@ setup(
             f"task_transmitter = {name}.task_transmitter:main",
             f"conveyor_belt = {name}.conveyor_belt:main",
             f"mobilebot = {name}.mobilebot:main",
+            f"sct.plant = {name}.sct.plant_node:main",
+            f"sct.supervisor = {name}.sct.supervisor_node:main",
         ],
     },
 )

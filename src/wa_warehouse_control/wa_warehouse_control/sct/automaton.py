@@ -1,16 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TypeAlias
+
+AutomatonTransitions: TypeAlias = dict[str, dict[str, str]]
+"""Automaton transitions described as mapping.
+
+The mapping consists of a state->event->next state sequence
+representes as two chained Python dictionaries.
+"""
 
 
 @dataclass
 class Automaton:
-    """A finite state automaton (FSM)."""
+    """A finite state automaton (FSM) with events that can be disabled."""
 
     state: str
     """The current state of the automaton."""
 
-    transitions: dict[str, dict[str, str]]
+    transitions: AutomatonTransitions
     """The transition function of the automaton"""
 
     states: set[str] = field(init=False)
@@ -20,7 +28,7 @@ class Automaton:
     """All events of the automaton."""
 
     enabled_events: set[str] = field(init=False)
-    """Enabled event of the automaton"""
+    """Enabled events of the automaton"""
 
     def __post_init__(self) -> None:
         """Initialize events and states."""
@@ -30,12 +38,15 @@ class Automaton:
             for state_transitions in self.transitions.values()
             for event in state_transitions
         }
-        # All events start enabled
-        self.enabled_events = self.events
+        self.reset_enabled_events()
 
     def current_transitions(self) -> dict[str, str]:
         """Get the transitions the automaton may undergo in this state."""
         return self.transitions.get(self.state, {})
+
+    def current_events(self) -> set[str]:
+        """Get the events that may occur in this state."""
+        return set(self.current_transitions().keys())
 
     def transition(self, event: str) -> None:
         """Transition between states."""
@@ -52,13 +63,12 @@ class Automaton:
             raise ValueError(f"Event '{event}' is disabled")
 
         self.state = next_state
+        self.enabled_events = self.events
 
-    def disable_event(self, event: str) -> None:
-        """Disable an event from occuring."""
-        if event in self.enabled_events:
-            self.enabled_events.remove(event)
+    def restrict_enabled_events(self, events: set[str]) -> None:
+        """Restrict currently enabled events to a subset.."""
+        self.enabled_events = self.enabled_events.intersection(events)
 
-    def enable_event(self, event: str) -> None:
-        """Enable an event, it may occur."""
-        if event in self.events:
-            self.enabled_events.add(event)
+    def reset_enabled_events(self) -> None:
+        """Reset all events to enabled."""
+        self.enabled_events = self.events
