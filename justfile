@@ -44,6 +44,11 @@ setup:
     # Default to x11 on QT apps (many break on wayland)
     export QT_QPA_PLATFORM="xcb"
 
+    # Use CycloneDDS implementation (faster and more stable networking),
+    # fixes time issues with nav2.
+    # See: https://github.com/ros-navigation/navigation2/issues/3352#issuecomment-1374005889
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
 # Build the ROS2 warehouse_automation workspace
 build packages="":
     #!/usr/bin/env bash

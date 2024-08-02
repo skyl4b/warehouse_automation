@@ -268,6 +268,7 @@
                 rosPackages.humble.turtlebot3-simulations
                 rosPackages.humble.turtlebot3-teleop
                 rosPackages.humble.nav2-bringup
+                rosPackages.humble.rmw-cyclonedds-cpp
 
                 # Husky overlaid packages
                 rosPackages.humble.husky-desktop
