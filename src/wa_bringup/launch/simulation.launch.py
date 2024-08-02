@@ -189,6 +189,7 @@ def spawn_robots(
                             LaunchConfiguration("close_radius"),
                             ")",
                         ]),
+                        "template_id": i,
                     },
                 ],
                 condition=IfCondition(

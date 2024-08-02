@@ -72,7 +72,7 @@ class PlantNode(Node):
         )
 
         # Parameters
-        self.declare_parameter("template_id", -1)
+        self.declare_parameter("template_id", 0)
         # Handle template
         if template is not None:
             model = template(self.template_id)

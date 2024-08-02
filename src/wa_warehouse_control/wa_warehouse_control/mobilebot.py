@@ -7,7 +7,6 @@ import rclpy
 from geometry_msgs import msg as geometry_msgs
 from nav_msgs import msg as nav_msgs
 from rcl_interfaces import msg as rcl_msgs
-from rclpy.node import Node
 from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
 from wa_interfaces import srv as wa_srvs
@@ -170,7 +169,12 @@ class Mobilebot(PlantNode):
         """How close must the robot get to the goal."""
         return cast(float, self.get_parameter("close_radius").value)
 
-    def parameter_event_callback(
+    @property
+    def uid(self) -> int:
+        """The uid of the robot."""
+        return self.template_id
+
+    def parameter_event_callback(  # pyright: ignore[reportImplicitOverride]
         self,
         message: rcl_msgs.ParameterEvent,
     ) -> None:
@@ -262,9 +266,6 @@ class Mobilebot(PlantNode):
     def goal_check_callback(self) -> None:
         """Check if the robot has reached the goal."""
         if self.task is None:
-            # Return to idle position on timer
-            # if not self.is_close(0.0, 0.0, close_radius=2.0):
-            #     self.go_to(0.0, 0.0)
             return
 
         if self.goal_status == "idle":
@@ -274,6 +275,7 @@ class Mobilebot(PlantNode):
                 self.task.start.pose.position.x,
                 self.task.start.pose.position.y,
             )
+            self.transition(f"work_{self.uid}")
             return
 
         if self.goal_status == "to_start":
@@ -296,9 +298,12 @@ class Mobilebot(PlantNode):
                         self.task.start.pose.position.y,
                     )
             else:
+                self.transition(f"goal_reached_{self.uid}")
 
                 def done_callback(_: rclpy.Future) -> None:
                     """Move to second goal."""
+                    self.transition(f"pick_box_{self.uid}")
+
                     if self.task is None:
                         self.get_logger().error(
                             "No task to set midpoint, something went wrong",
@@ -337,9 +342,12 @@ class Mobilebot(PlantNode):
                         self.task.end.pose.position.y,
                     )
             else:
+                self.transition(f"goal_reached_{self.uid}")
 
                 def done_callback(_: rclpy.Future) -> None:
                     """Idle goal."""
+                    self.transition(f"drop_box_{self.uid}")
+
                     if self.task is None:
                         self.get_logger().error(
                             "No task to set complete, something went wrong",

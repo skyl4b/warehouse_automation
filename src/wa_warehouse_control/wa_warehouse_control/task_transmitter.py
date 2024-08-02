@@ -202,11 +202,12 @@ class TaskTransmitter(PlantNode):
         """Publish period of the map."""
         return cast(float, self.get_parameter("publish_map_period").value)
 
-    def parameter_event_callback(
+    def parameter_event_callback(  # pyright: ignore[reportImplicitOverride]
         self,
         message: rcl_msgs.ParameterEvent,
     ) -> None:
         """Monitor changes to this node's parameters to update the timer."""
+        super().parameter_event_callback(message)
         if message.node == self.get_fully_qualified_name():
             for parameter in message.changed_parameters:
                 if parameter.name == "broadcast_period":
@@ -271,6 +272,7 @@ class TaskTransmitter(PlantNode):
             self.task = task
 
         self.get_logger().info(f"Broadcasting task {self.task.uid}")
+        self.transition("broadcast")
         self.broadcast.publish(std_msgs.UInt8(data=self.task.uid))
 
     def publish_map_callback(self) -> None:
@@ -397,6 +399,9 @@ class TaskTransmitter(PlantNode):
                 ),
             ).add_done_callback(self.set_box_id_callback)
             box_id = None
+
+            # Input task event
+            event = f"tin_{map_['storage_units'].index(storage_unit)}"
         else:
             start = storage_unit
             end = conveyor_belt
@@ -408,6 +413,9 @@ class TaskTransmitter(PlantNode):
                 )
                 return None
             box_id = start["box_id"]
+
+            # Output task event
+            event = f"tout_{map_['storage_units'].index(storage_unit)}"
 
         # Set to in-use for now, override with callback
         self.set_model_box_id(start["name"], "in-use")
@@ -431,6 +439,7 @@ class TaskTransmitter(PlantNode):
             f"x: {end['position']['x']:.2f}, y: {end['position']['y']:.2f}"
             ")",
         )
+        self.transition(event)
         return task
 
     def find_resources(
@@ -523,6 +532,8 @@ class TaskTransmitter(PlantNode):
         response: wa_srvs.TaskConfirmation.Response,
     ) -> wa_srvs.TaskConfirmation.Response:
         """Confirm or not a task to a robot that requested it."""
+        robot_id = int(request.robot.removeprefix("mobilebot_")) - 1
+        self.transition(f"request_{robot_id}")
         if (
             self.task is None
             or not isinstance(self.task.box_id, int)
@@ -533,6 +544,7 @@ class TaskTransmitter(PlantNode):
             )
             response.confirmation = False
             response.task.uid = request.task_uid
+            self.transition(f"deny_{robot_id}")
             return response
 
         self.get_logger().info(
@@ -562,6 +574,7 @@ class TaskTransmitter(PlantNode):
             box_id=self.task.box_id,
         )
         self.active_tasks.append(self.task)
+        self.transition(f"accept_{robot_id}")
         self.task = None
 
         return response
