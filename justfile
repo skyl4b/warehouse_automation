@@ -136,6 +136,9 @@ gazebo world="empty":
 bag-record name *topics="--all":
     ros2 bag record --use-sim-time -o experiments/bag_recordings/{{name}} {{topics}}
 
+# Record the warehouse automaton simulation
+record name="simulation": (bag-record name "/wa/task/started" "/wa/task/completed" "/wa/demand_generator/demand" "/wa/demand_generator/unbounded_demand" "/wa/task_transmitter/map")
+
 # Launch the warehouse automation simulation
 launch *args:
     ros2 launch wa_bringup simulation.launch.py {{args}}

@@ -6,11 +6,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from bag_display import parse_bag
 from cycler import cycler
+from std_msgs import msg as std_msgs
 from wa_interfaces import msg as wa_msgs
 
 if TYPE_CHECKING:
@@ -22,7 +22,9 @@ def plot_simulation() -> None:
     configure_matplotlib_for_scientific_plots()
 
     # Parse bag recording
-    bag = parse_bag(Path(__file__).parent / "bag_recordings" / "demand")
+    bag = parse_bag(
+        Path(__file__).parent / "bag_recordings" / "simulation_map",
+    )
 
     # Demand plot
     plot_demand(
@@ -36,18 +38,24 @@ def plot_simulation() -> None:
             for topic, demand, time in bag
             if topic == "/wa/demand_generator/unbounded_demand"
         ],
+        [
+            (time, cast(std_msgs.String, map_))
+            for topic, map_, time in bag
+            if topic == "/wa/task_transmitter/map"
+        ],
     )
 
 
 def plot_demand(
     demand: list[tuple[datetime, wa_msgs.Demand]],
     unbounded_demand: list[tuple[datetime, wa_msgs.Demand]],
-    time_unit: str = "seconds",  # 'seconds', 'minutes', 'hours', etc.
+    map_: list[tuple[datetime, std_msgs.String]],
 ) -> None:
     """Plot the demand of the warehouse during the simulation."""
     # Time
     t_d = [time for time, _ in demand]
     t_u = [time for time, _ in unbounded_demand]
+    t_s = [time for time, _ in map_]
 
     # Demand
     d_i = [message.input_demand for _, message in demand]
@@ -57,14 +65,22 @@ def plot_demand(
     u_i = [message.input_demand for _, message in unbounded_demand]
     u_o = [message.output_demand for _, message in unbounded_demand]
 
+    # Storage
+    s = [
+        sum(su != "E" for su in message.data.split("||", maxsplit=3)[1])
+        for _, message in map_
+    ]
+
     # Convert to relative time
     s_d = t_d[0]
     t_d = [(t_i - s_d).total_seconds() for t_i in t_d]
     s_u = t_u[0]
     t_u = [(t_i - s_u).total_seconds() for t_i in t_u]
+    s_s = t_s[0]
+    t_s = [(t_i - s_s).total_seconds() for t_i in t_s]
 
     # Plot
-    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    _, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 6))
 
     # Zeroth order interpolation plot for input demand
     ax1.plot(t_d, d_i, label=r"$D_i(t)$", drawstyle="steps-post", color="k")
@@ -76,7 +92,7 @@ def plot_demand(
         linestyle="--",
         color="darkblue",
     )
-    ax1.set_xlabel(f"Time [{time_unit}]")
+    ax1.set_xlabel("Time [seconds]")
     ax1.set_ylabel(r"Input demand [box units]")
     ax1.set_ylim((-0.25, max(*u_i, *u_o) + 1))
     ax1.set_yticks(list(range(max(*u_i, *u_o) + 1)))
@@ -92,14 +108,29 @@ def plot_demand(
         linestyle="--",
         color="darkblue",
     )
-    ax2.set_xlabel(f"Time [{time_unit}]")
+    ax2.set_xlabel("Time [seconds]")
     ax2.set_ylabel(r"Output demand [box units]")
     ax2.set_ylim((-0.25, max(*u_i, *u_o) + 1))
     ax2.set_yticks(list(range(max(*u_i, *u_o) + 1)))
     ax2.legend()
 
+    # Storage plot
+    ax3.plot(t_s, s, label=r"$S(t)$", drawstyle="steps-post", color="k")
+    ax3.set_xlabel("Time [seconds]")
+    ax3.set_ylabel(r"Warehouse storage [box units]")
+    ax3.set_ylim((-0.25, 10 + 0.25))
+    ax3.set_yticks(list(range(10 + 1)))
+    ax3.legend()
+
     plt.tight_layout(pad=5.0)
     plt.show()
+
+
+# def plot task_completion_time(
+#     task_started: list[tuple[datetime, wa_msgs.Demand]],
+#     task_completed: list[tuple[datetime, wa_msgs.Demand]],
+# ):
+#     pass
 
 
 def configure_matplotlib_for_scientific_plots() -> None:
